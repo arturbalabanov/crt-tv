@@ -68,7 +68,7 @@ TIMESTAMP_PADDING_BOTTOM = 30
 TIMESTAMP_FONT_NAME = "Arial Unicode.ttf"
 TIMESTAMP_FALLBACK_FONT_NAME = "FreeSans.ttf"
 TIMESTAMP_FONT_SIZE = 80
-TIMESTAMP_DETECT_TIMEOUT_SECONDS = 5
+TIMESTAMP_DETECT_TIMEOUT_SECONDS = 30
 
 
 def parse_cli_args() -> argparse.Namespace:
@@ -322,6 +322,11 @@ def main(args: argparse.Namespace) -> None:
                 image_timestamp = parse_timestamp_from_image(img)
             except ValueError:
                 print(f"WARNING: No timestamp found in {relative_image_path}")
+                image_timestamp = None
+            except RuntimeError:
+                print(
+                    f"WARNING: Tesseract timed out while processing {relative_image_path}"
+                )
                 image_timestamp = None
 
             resized_img = resize_image(
