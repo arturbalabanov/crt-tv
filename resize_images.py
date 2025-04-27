@@ -148,6 +148,12 @@ def parse_cli_args() -> argparse.Namespace:
         default=None,
     )
     parser.add_argument(
+        "--failed-timestamp-extracts-dir",
+        type=pathlib.Path,
+        help="A directory which will contain the cut parts of the images where the timestamp extraction failed",
+        default=None,
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -194,17 +200,38 @@ def get_new_dimensions(
 
 
 def parse_timestamp_from_image(
-    img: Image, config: ScriptConfig
+    img: Image,
+    config: ScriptConfig,
+    failed_timestamp_extracts_dir: pathlib.Path | None,
 ) -> datetime.datetime | datetime.date:
-    logger.debug("Extracting all text from from the image")
+    logger.debug("Cutting the bottom left corner of the image to extract the timestamp")
+
+    img_width, img_height = img.size
+    timestamp_region = img.crop((0, img_height - 100, 1000, img_height))
+
+    logger.debug("Extracting all text from from the cut part of the image")
 
     extracted_text = pytesseract.image_to_string(
-        img, timeout=config.timestamp.detect_timeout_seconds
+        timestamp_region, timeout=config.timestamp.detect_timeout_seconds
     )
 
     logger.debug(f"Extracted text: '{extracted_text}'")
 
     match = TIMESTAMP_PARSE_REGEX.search(extracted_text)
+
+    if failed_timestamp_extracts_dir and (not match or match.group("time") is None):
+        logger.debug(
+            f"Couldn't extract the timestamp, saving the cut part of the image to {failed_timestamp_extracts_dir}"
+        )
+
+        failed_timestamp_extracts_dir.mkdir(parents=True, exist_ok=True)
+
+        output_image_path = (
+            failed_timestamp_extracts_dir / pathlib.Path(img.filename).name
+        )
+        timestamp_region.save(output_image_path)
+
+        logger.info(f"Saved cut part of the image to {output_image_path}")
 
     if not match:
         logger.debug("No timestamp match was found in the image")
@@ -379,7 +406,9 @@ def process_single_file(
 
     with Image.open(image_path) as img:
         try:
-            image_timestamp = parse_timestamp_from_image(img, config)
+            image_timestamp = parse_timestamp_from_image(
+                img, config, args.failed_timestamp_extracts_dir
+            )
         except ValueError:
             logger.warning(f"No timestamp found in {image_path.name}")
             image_timestamp = None
@@ -499,6 +528,15 @@ if __name__ == "__main__":
 
         logger.info(f"Loading configuration from {args.config_file.resolve()}")
         config = ScriptConfig.load_from_file(args.config_file)
+
+    if (
+        args.failed_timestamp_extracts_dir is not None
+        and not args.failed_timestamp_extracts_dir.is_dir()
+    ):
+        logger.error(
+            f"--failed-timestamp-extracts-dir: {args.failed_timestamp_extracts_dir} is not a directory"
+        )
+        sys.exit(1)
 
     try:
         main(args, config)
