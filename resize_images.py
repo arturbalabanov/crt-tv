@@ -63,6 +63,8 @@ TIMESTAMP_PARSE_REGEX = re.compile(
     re.VERBOSE,
 )
 
+ASSETS_DIR = pathlib.Path(__file__).parent / "assets"
+
 
 class TimestampConfig(pydantic.BaseModel):
     date_format: str = "%-d %b %Y"  # e.g. 6 Nov 2024
@@ -77,10 +79,12 @@ class TimestampConfig(pydantic.BaseModel):
     padding_right: int = 100
     padding_top: int = 30
     padding_bottom: int = 30
-    font_names: list[str] = pydantic.Field(
+    font_names: list[str | pathlib.Path] = pydantic.Field(
         default_factory=lambda: [
-            "Arial Unicode.ttf",
-            "FreeSans.ttf",
+            (ASSETS_DIR / "VCR_OSD_MONO_1.001.ttf"),
+            "Courier New Bold.ttf",
+            "Courier Bold.ttf",
+            "FreeMonoBold.ttf",
         ],
         description=textwrap.dedent("""
              List of fonts to use for the timestamp (the first match will be used)
