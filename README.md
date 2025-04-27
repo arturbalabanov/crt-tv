@@ -20,7 +20,7 @@ recognision to try to extract it from the original image and re-apply it in the 
 Example usage:
 
 ```sh
-uv run resize_images.py --input-dir ~/retrosnap-photos --output-dir ~/cropped-photos --resize-method crop --timestamp-position "bottom left" 
+uv run resize_images.py ~/retrosnap-photos --output ~/cropped-photos/ --resize-method crop --timestamp-position "bottom left" 
 ```
 
 Use  `resize_images.py --help` for all options as well as the contents of the script itself

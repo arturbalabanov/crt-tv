@@ -111,15 +111,14 @@ def parse_cli_args() -> argparse.Namespace:
         description="Resize images into a different aspect ratio"
     )
     parser.add_argument(
-        "--input-dir",
+        "input",
         type=pathlib.Path,
-        help="Directory containing the original files",
-        required=True,
+        help="File or directory of files to process",
     )
     parser.add_argument(
-        "--output-dir",
+        "--output",
         type=pathlib.Path,
-        help="The output directory for the processed playlist",
+        help="The output path of the processed file (or directory if input is directory)",
         required=True,
     )
     parser.add_argument(
@@ -150,12 +149,12 @@ def parse_cli_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
 
-    if not args.input_dir.is_dir():
-        logger.error(f"--input-dir: {args.input_dir} is not a directory")
+    if not args.input.exists():
+        logger.error(f"Input file {args.input} is does not exist")
         sys.exit(1)
 
-    if not args.output_dir.is_dir():
-        logger.error(f"--output-dir: {args.output_dir} is not a directory")
+    if args.input.is_dir() and args.output.exists() and not args.output.is_dir():
+        logger.error("Input is a directory but output is a file")
         sys.exit(1)
 
     if not ASPECT_RATIO_REGEX.match(args.aspect_ratio):
@@ -213,7 +212,9 @@ def get_new_dimensions(
     return new_width, new_height
 
 
-def parse_timestamp_from_image(img: Image) -> datetime.datetime | datetime.date:
+def parse_timestamp_from_image(
+    img: Image, config: ScriptConfig
+) -> datetime.datetime | datetime.date:
     datetime_text = pytesseract.image_to_string(
         img, timeout=config.timestamp.detect_timeout_seconds
     )
@@ -242,6 +243,7 @@ def draw_timestamp(
     *,
     position: Literal["top left", "top right", "bottom left", "bottom right"],
     font: ImageFont,
+    config: ScriptConfig,
 ) -> None:
     # NOTE: It's important to check for datetime first since datetime is a subclass of date
 
@@ -330,7 +332,6 @@ def draw_timestamp(
 def resize_image(
     img: Image,
     new_aspect_ratio: str,
-    output_dir: pathlib.Path,
     *,
     resize_method: Literal["stretch", "crop"],
 ) -> Image:
@@ -374,56 +375,86 @@ def get_timestamp_font(config: ScriptConfig) -> ImageFont:
     raise OSError(f"None of the fonts {config.timestamp.font_names} were found")
 
 
+def process_single_file(
+    image_path: pathlib.Path,
+    args: argparse.Namespace,
+    config: ScriptConfig,
+    timestamp_font: ImageFont,
+    output_image_path: pathlib.Path,
+) -> None:
+    logger.info(f"Processing {image_path.name}")
+
+    with Image.open(image_path) as img:
+        try:
+            image_timestamp = parse_timestamp_from_image(img, config)
+        except ValueError:
+            logger.warning(f"No timestamp found in {image_path.name}")
+            image_timestamp = None
+        except RuntimeError:
+            logger.warning(f"Tesseract timed out while processing {image_path.name}")
+            image_timestamp = None
+
+        resized_img = resize_image(
+            img,
+            new_aspect_ratio=args.aspect_ratio,
+            resize_method=args.resize_method,
+        )
+
+        if image_timestamp is not None:
+            draw_timestamp(
+                resized_img,
+                image_timestamp,
+                position=args.timestamp_position,
+                font=timestamp_font,
+                config=config,
+            )
+
+        resized_img.save(output_image_path.resolve())
+
+        logger.info(f"Completed processing image {image_path.name}")
+
+
 def main(args: argparse.Namespace, config: ScriptConfig) -> None:
-    processed_images_count = 0
+    images_str = "images in directory" if args.input.is_dir() else "image"
 
     logger.info(
-        f"Resizing images in {args.input_dir} to {args.aspect_ratio} aspect ratio "
+        f"Resizing {images_str} {args.input} to {args.aspect_ratio} aspect ratio "
         f"using {args.resize_method} method"
     )
 
     timestamp_font = get_timestamp_font(config)
 
-    for image_path in args.input_dir.glob("**/*.[jJ][pP][gG]"):
-        relative_image_path = image_path.relative_to(args.input_dir)
+    if args.input.is_file():
+        if args.input.suffix.lower() != ".jpg":
+            logger.error(
+                f"Input file {args.input} is not a JPG file, only JPG files are supported"
+            )
+            sys.exit(1)
 
-        logger.info(f"Processing {relative_image_path}")
+        if args.output.is_dir():
+            output_file_path = args.output / args.input.name
+        else:
+            output_file_path = args.output
 
-        with Image.open(image_path) as img:
-            try:
-                image_timestamp = parse_timestamp_from_image(img)
-            except ValueError:
-                logger.warning(f"No timestamp found in {relative_image_path}")
-                image_timestamp = None
-            except RuntimeError:
-                logger.warning(
-                    f"Tesseract timed out while processing {relative_image_path}"
-                )
-                image_timestamp = None
+        process_single_file(args.input, args, config, timestamp_font, output_file_path)
+    elif args.input.is_dir():
+        processed_images_count = 0
 
-            resized_img = resize_image(
-                img,
-                new_aspect_ratio=args.aspect_ratio,
-                output_dir=args.output_dir,
-                resize_method=args.resize_method,
+        for image_path in args.input.glob("**/*.[jJ][pP][gG]"):
+            relative_image_path = image_path.relative_to(args.input)
+
+            output_image_path = args.output / relative_image_path
+            output_image_path.parent.mkdir(parents=True, exist_ok=True)
+
+            process_single_file(
+                image_path, args, config, timestamp_font, output_image_path
             )
 
-            if image_timestamp is not None:
-                draw_timestamp(
-                    resized_img,
-                    image_timestamp,
-                    position=args.timestamp_position,
-                    font=timestamp_font,
-                )
-
-            output_image_path = args.output_dir / relative_image_path
-            output_image_path.parent.mkdir(parents=True, exist_ok=True)
-            resized_img.save(output_image_path.resolve())
-
-            logger.info(f"Completed processing image {relative_image_path}")
             processed_images_count += 1
 
-    logger.info(f"Processed {processed_images_count} images")
+        logger.info(f"Processed {processed_images_count} images")
+    else:
+        raise OSError(f"Input file {args.input} is not a file or directory")
 
 
 def configure_logging() -> None:
@@ -452,6 +483,6 @@ if __name__ == "__main__":
         main(args, config)
     except KeyboardInterrupt:
         logger.warning(
-            "Process interrupted by user, partial results may be present in the output directory"
+            "Process interrupted by user, partial results may be present in the output"
         )
         sys.exit(130)
