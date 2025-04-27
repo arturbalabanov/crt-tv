@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.12,<3.13"
 # dependencies = [
 #     "loguru==0.7.3",
 #     "pillow==11.2.1",
@@ -11,7 +11,7 @@ import pathlib
 import argparse
 import sys
 import re
-from typing import Literal, Union
+from typing import Literal
 import datetime
 
 import pytesseract  # type: ignore[import-not-found]
@@ -168,7 +168,7 @@ def get_new_dimensions(
     return new_width, new_height
 
 
-def parse_timestamp_from_image(img: Image) -> Union[datetime.datetime, datetime.date]:
+def parse_timestamp_from_image(img: Image) -> datetime.datetime | datetime.date:
     datetime_text = pytesseract.image_to_string(
         img, timeout=TIMESTAMP_DETECT_TIMEOUT_SECONDS
     )
@@ -193,7 +193,7 @@ def parse_timestamp_from_image(img: Image) -> Union[datetime.datetime, datetime.
 
 def draw_timestamp(
     img: Image,
-    timestamp: Union[datetime.datetime, datetime.date],
+    timestamp: datetime.datetime | datetime.date,
     *,
     position: Literal["top left", "top right", "bottom left", "bottom right"],
 ) -> None:
@@ -377,4 +377,11 @@ def configure_logging() -> None:
 if __name__ == "__main__":
     configure_logging()
     args = parse_cli_args()
-    main(args)
+
+    try:
+        main(args)
+    except KeyboardInterrupt:
+        logger.warning(
+            "Process interrupted by user, partial results may be present in the output directory"
+        )
+        sys.exit(130)
