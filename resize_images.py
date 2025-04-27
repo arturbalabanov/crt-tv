@@ -11,6 +11,7 @@
 import pathlib
 import argparse
 import sys
+import textwrap
 import tomllib
 import re
 from typing import Literal, Self
@@ -76,10 +77,16 @@ class TimestampConfig(pydantic.BaseModel):
     padding_right: int = 100
     padding_top: int = 30
     padding_bottom: int = 30
-    # TODO: Convert to a list of fonts
-    # ref: https://pillow.readthedocs.io/en/stable/reference/ImageFont.html#PIL.ImageFont.truetype
-    font_name: str = "Arial Unicode.ttf"
-    fallback_font_name: str = "FreeSans.ttf"
+    font_names: list[str] = pydantic.Field(
+        default_factory=lambda: [
+            "Arial Unicode.ttf",
+            "FreeSans.ttf",
+        ],
+        description=textwrap.dedent("""
+             List of fonts to use for the timestamp (the first match will be used)
+             ref: https://pillow.readthedocs.io/en/stable/reference/ImageFont.html#PIL.ImageFont.truetype
+        """).strip(),
+    )
     font_size: int = 80
     detect_timeout_seconds: int = 30
 
@@ -230,16 +237,8 @@ def draw_timestamp(
     timestamp: datetime.datetime | datetime.date,
     *,
     position: Literal["top left", "top right", "bottom left", "bottom right"],
+    font: ImageFont,
 ) -> None:
-    try:
-        timestamp_font = ImageFont.truetype(
-            config.timestamp.font_name, config.timestamp.font_size
-        )
-    except OSError:
-        timestamp_font = ImageFont.truetype(
-            config.timestamp.fallback_font_name, config.timestamp.font_size
-        )
-
     if isinstance(timestamp, datetime.date):
         timestamp_text = timestamp.strftime(config.timestamp.date_format)
     elif isinstance(timestamp, datetime.datetime):
@@ -253,7 +252,7 @@ def draw_timestamp(
     text_bbox_left, text_bbox_top, text_bbox_right, text_bbox_bottom = draw.textbbox(
         xy=(0, 0),
         text=timestamp_text,
-        font=timestamp_font,
+        font=font,
     )
 
     text_width = text_bbox_right - text_bbox_left
@@ -317,7 +316,7 @@ def draw_timestamp(
         xy=(text_x, text_y),
         text=timestamp_text,
         fill=config.timestamp.fg_color,
-        font=timestamp_font,
+        font=font,
     )
 
 
@@ -353,6 +352,21 @@ def resize_image(
     return resized_img
 
 
+def get_timestamp_font(config: ScriptConfig) -> ImageFont:
+    logger.info("Searching for timestamp font")
+
+    for font_name in config.timestamp.font_names:
+        try:
+            font = ImageFont.truetype(font_name, config.timestamp.font_size)
+        except OSError:
+            logger.warning(f"Font '{font_name}' not found, trying next font")
+        else:
+            logger.info(f"Using timestamp font: {font_name}")
+            return font
+
+    raise OSError(f"None of the fonts {config.timestamp.font_names} were found")
+
+
 def main(args: argparse.Namespace, config: ScriptConfig) -> None:
     processed_images_count = 0
 
@@ -360,6 +374,8 @@ def main(args: argparse.Namespace, config: ScriptConfig) -> None:
         f"Resizing images in {args.input_dir} to {args.aspect_ratio} aspect ratio "
         f"using {args.resize_method} method"
     )
+
+    timestamp_font = get_timestamp_font(config)
 
     for image_path in args.input_dir.glob("**/*.[jJ][pP][gG]"):
         relative_image_path = image_path.relative_to(args.input_dir)
@@ -395,6 +411,7 @@ def main(args: argparse.Namespace, config: ScriptConfig) -> None:
                     resized_img,
                     image_timestamp,
                     position=args.timestamp_position,
+                    font=timestamp_font,
                 )
 
             output_image_path = args.output_dir / relative_image_path
