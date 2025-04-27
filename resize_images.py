@@ -223,7 +223,7 @@ def draw_timestamp(
     bottom_y = (
         img.height
         - text_height
-        - -TIMESTAMP_MARGIN_TOP
+        - TIMESTAMP_MARGIN_TOP
         - TIMESTAMP_MARGIN_BOTTOM
         - TIMESTAMP_PADDING_TOP
         - TIMESTAMP_PADDING_BOTTOM
