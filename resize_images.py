@@ -3,6 +3,7 @@
 # dependencies = [
 #     "loguru==0.7.3",
 #     "pillow==11.2.1",
+#     "pydantic==2.11.3",
 #     "pytesseract==0.3.13",
 # ]
 # ///
@@ -10,10 +11,12 @@
 import pathlib
 import argparse
 import sys
+import tomllib
 import re
-from typing import Literal
+from typing import Literal, Self
 import datetime
 
+import pydantic  # type: ignore[import-not-found]
 import pytesseract  # type: ignore[import-not-found]
 from PIL import Image, ImageDraw, ImageFont  # type: ignore[import-untyped]
 from loguru import logger  # type: ignore[import-not-found]
@@ -59,23 +62,37 @@ TIMESTAMP_PARSE_REGEX = re.compile(
     re.VERBOSE,
 )
 
-TIMESTAMP_DATE_FORMAT = "%-d %b %Y"  # e.g. 6 Nov 2024
-TIMESTAMP_FULL_FORMAT = f"{TIMESTAMP_DATE_FORMAT} %H:%M:%S"  # e.g. 6 Nov 2024 19:49:02
-TIMESTAMP_FG_COLOR = "white"
-TIMESTAMP_BG_COLOR = "black"
-TIMESTAMP_MARGIN_LEFT = 0
-TIMESTAMP_MARGIN_RIGHT = 0
-TIMESTAMP_MARGIN_TOP = 0
-TIMESTAMP_MARGIN_BOTTOM = 30
-TIMESTAMP_PADDING_LEFT = 130
-TIMESTAMP_PADDING_RIGHT = 100
-TIMESTAMP_PADDING_TOP = 30
-TIMESTAMP_PADDING_BOTTOM = 30
-# ref: https://pillow.readthedocs.io/en/stable/reference/ImageFont.html#PIL.ImageFont.truetype
-TIMESTAMP_FONT_NAME = "Arial Unicode.ttf"
-TIMESTAMP_FALLBACK_FONT_NAME = "FreeSans.ttf"
-TIMESTAMP_FONT_SIZE = 80
-TIMESTAMP_DETECT_TIMEOUT_SECONDS = 30
+
+class TimestampConfig(pydantic.BaseModel):
+    date_format: str = "%-d %b %Y"  # e.g. 6 Nov 2024
+    full_format: str = "%-d %b %Y %H:%M:%S"  # e.g. 6 Nov 2024 19:49:02
+    fg_color: str | tuple[int, int, int] = "white"
+    bg_color: str | tuple[int, int, int] = "black"
+    margin_left: int = 0
+    margin_right: int = 0
+    margin_top: int = 0
+    margin_bottom: int = 30
+    padding_left: int = 130
+    padding_right: int = 100
+    padding_top: int = 30
+    padding_bottom: int = 30
+    # TODO: Convert to a list of fonts
+    # ref: https://pillow.readthedocs.io/en/stable/reference/ImageFont.html#PIL.ImageFont.truetype
+    font_name: str = "Arial Unicode.ttf"
+    fallback_font_name: str = "FreeSans.ttf"
+    font_size: int = 80
+    detect_timeout_seconds: int = 30
+
+
+class ScriptConfig(pydantic.BaseModel):
+    timestamp: TimestampConfig = pydantic.Field(default_factory=TimestampConfig)
+
+    @classmethod
+    def load_from_file(cls, file_path: pathlib.Path) -> Self:
+        with file_path.open("rb") as f:
+            data = tomllib.load(f)
+
+        return cls.model_validate(data)
 
 
 def parse_cli_args() -> argparse.Namespace:
@@ -114,6 +131,12 @@ def parse_cli_args() -> argparse.Namespace:
         help="Position of the timestamp on the image",
         required=True,
     )
+    parser.add_argument(
+        "--config-file",
+        type=pathlib.Path,
+        help="Path to the configuration file (in TOML format) if not using the default values",
+        default=None,
+    )
     args = parser.parse_args()
 
     if not args.input_dir.is_dir():
@@ -129,6 +152,17 @@ def parse_cli_args() -> argparse.Namespace:
             f"--aspect-ratio: Invalid aspect ratio '{args.aspect_ratio}', must be in the form 'width:height'"
         )
         sys.exit(1)
+
+    if args.config_file is not None:
+        if not args.config_file.is_file():
+            logger.error(f"--config-file: {args.config_file} is not a file")
+            sys.exit(1)
+
+        if args.config_file.suffix != ".toml":
+            logger.error(
+                f"--config-file: {args.config_file} is not a TOML file, must be .toml"
+            )
+            sys.exit(1)
 
     return args
 
@@ -170,7 +204,7 @@ def get_new_dimensions(
 
 def parse_timestamp_from_image(img: Image) -> datetime.datetime | datetime.date:
     datetime_text = pytesseract.image_to_string(
-        img, timeout=TIMESTAMP_DETECT_TIMEOUT_SECONDS
+        img, timeout=config.timestamp.detect_timeout_seconds
     )
     match = TIMESTAMP_PARSE_REGEX.search(datetime_text)
 
@@ -198,16 +232,18 @@ def draw_timestamp(
     position: Literal["top left", "top right", "bottom left", "bottom right"],
 ) -> None:
     try:
-        timestamp_font = ImageFont.truetype(TIMESTAMP_FONT_NAME, TIMESTAMP_FONT_SIZE)
+        timestamp_font = ImageFont.truetype(
+            config.timestamp.font_name, config.timestamp.font_size
+        )
     except OSError:
         timestamp_font = ImageFont.truetype(
-            TIMESTAMP_FALLBACK_FONT_NAME, TIMESTAMP_FONT_SIZE
+            config.timestamp.fallback_font_name, config.timestamp.font_size
         )
 
     if isinstance(timestamp, datetime.date):
-        timestamp_text = timestamp.strftime(TIMESTAMP_DATE_FORMAT)
+        timestamp_text = timestamp.strftime(config.timestamp.date_format)
     elif isinstance(timestamp, datetime.datetime):
-        timestamp_text = timestamp.strftime(TIMESTAMP_FULL_FORMAT)
+        timestamp_text = timestamp.strftime(config.timestamp.full_format)
     else:
         raise TypeError(
             f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
@@ -227,19 +263,19 @@ def draw_timestamp(
     right_x = (
         img.width
         - text_width
-        - TIMESTAMP_MARGIN_LEFT
-        - TIMESTAMP_MARGIN_RIGHT
-        - TIMESTAMP_PADDING_LEFT
-        - TIMESTAMP_PADDING_RIGHT
+        - config.timestamp.margin_left
+        - config.timestamp.margin_right
+        - config.timestamp.padding_left
+        - config.timestamp.padding_right
     )
     top_y = 0
     bottom_y = (
         img.height
         - text_height
-        - TIMESTAMP_MARGIN_TOP
-        - TIMESTAMP_MARGIN_BOTTOM
-        - TIMESTAMP_PADDING_TOP
-        - TIMESTAMP_PADDING_BOTTOM
+        - config.timestamp.margin_top
+        - config.timestamp.margin_bottom
+        - config.timestamp.padding_top
+        - config.timestamp.padding_bottom
     )
 
     if position == "top left":
@@ -255,26 +291,32 @@ def draw_timestamp(
             f"Invalid position '{position}', must be 'top left', 'top right', 'bottom left', or 'bottom right'"
         )
 
-    bg_rect_left = timestamp_x + TIMESTAMP_MARGIN_LEFT
-    bg_rect_top = timestamp_y + TIMESTAMP_MARGIN_TOP
+    bg_rect_left = timestamp_x + config.timestamp.margin_left
+    bg_rect_top = timestamp_y + config.timestamp.margin_top
     bg_rect_right = (
-        bg_rect_left + TIMESTAMP_PADDING_LEFT + text_width + TIMESTAMP_PADDING_RIGHT
+        bg_rect_left
+        + config.timestamp.padding_left
+        + text_width
+        + config.timestamp.padding_right
     )
     bg_rect_bottom = (
-        bg_rect_top + TIMESTAMP_PADDING_TOP + text_height + TIMESTAMP_PADDING_BOTTOM
+        bg_rect_top
+        + config.timestamp.padding_top
+        + text_height
+        + config.timestamp.padding_bottom
     )
 
-    text_x = bg_rect_left + TIMESTAMP_PADDING_LEFT
-    text_y = bg_rect_top - text_bbox_top + TIMESTAMP_PADDING_TOP
+    text_x = bg_rect_left + config.timestamp.padding_left
+    text_y = bg_rect_top - text_bbox_top + config.timestamp.padding_top
 
     draw.rectangle(
         (bg_rect_left, bg_rect_top, bg_rect_right, bg_rect_bottom),
-        fill=TIMESTAMP_BG_COLOR,
+        fill=config.timestamp.bg_color,
     )
     draw.text(
         xy=(text_x, text_y),
         text=timestamp_text,
-        fill=TIMESTAMP_FG_COLOR,
+        fill=config.timestamp.fg_color,
         font=timestamp_font,
     )
 
@@ -311,7 +353,7 @@ def resize_image(
     return resized_img
 
 
-def main(args: argparse.Namespace) -> None:
+def main(args: argparse.Namespace, config: ScriptConfig) -> None:
     processed_images_count = 0
 
     logger.info(
@@ -378,8 +420,17 @@ if __name__ == "__main__":
     configure_logging()
     args = parse_cli_args()
 
+    if args.config_file is None:
+        config = ScriptConfig()
+        logger.info(
+            "Using default configuration values, use --config-file to set custom configuration values"
+        )
+    else:
+        logger.info(f"Loading configuration from {args.config_file.resolve()}")
+        config = ScriptConfig.load_from_file(args.config_file)
+
     try:
-        main(args)
+        main(args, config)
     except KeyboardInterrupt:
         logger.warning(
             "Process interrupted by user, partial results may be present in the output directory"
