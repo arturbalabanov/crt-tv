@@ -147,34 +147,15 @@ def parse_cli_args() -> argparse.Namespace:
         help="Path to the configuration file (in TOML format) if not using the default values",
         default=None,
     )
-    args = parser.parse_args()
-
-    if not args.input.exists():
-        logger.error(f"Input file {args.input} is does not exist")
-        sys.exit(1)
-
-    if args.input.is_dir() and args.output.exists() and not args.output.is_dir():
-        logger.error("Input is a directory but output is a file")
-        sys.exit(1)
-
-    if not ASPECT_RATIO_REGEX.match(args.aspect_ratio):
-        logger.error(
-            f"--aspect-ratio: Invalid aspect ratio '{args.aspect_ratio}', must be in the form 'width:height'"
-        )
-        sys.exit(1)
-
-    if args.config_file is not None:
-        if not args.config_file.is_file():
-            logger.error(f"--config-file: {args.config_file} is not a file")
-            sys.exit(1)
-
-        if args.config_file.suffix != ".toml":
-            logger.error(
-                f"--config-file: {args.config_file} is not a TOML file, must be .toml"
-            )
-            sys.exit(1)
-
-    return args
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        help="Enable DEBUG logs in the output",
+        default=False,
+    )
+    return parser.parse_args()
 
 
 def get_new_dimensions(
@@ -215,24 +196,36 @@ def get_new_dimensions(
 def parse_timestamp_from_image(
     img: Image, config: ScriptConfig
 ) -> datetime.datetime | datetime.date:
-    datetime_text = pytesseract.image_to_string(
+    logger.debug("Extracting all text from from the image")
+
+    extracted_text = pytesseract.image_to_string(
         img, timeout=config.timestamp.detect_timeout_seconds
     )
-    match = TIMESTAMP_PARSE_REGEX.search(datetime_text)
+
+    logger.debug(f"Extracted text: '{extracted_text}'")
+
+    match = TIMESTAMP_PARSE_REGEX.search(extracted_text)
 
     if not match:
+        logger.debug("No timestamp match was found in the image")
         raise ValueError("No datetime found in the image")
 
     year = int(match.group("year"))
     month = int(match.group("month"))
     day = int(match.group("day"))
 
+    logger.debug(f"Date match was successful: {year=}, {month=}, {day=}")
+
     if match.group("time") is None:
+        logger.debug("Couldn't extract the time compontents, using only the date")
+
         return datetime.date(year, month, day)
 
     hour = int(match.group("hour"))
     minute = int(match.group("minute"))
     second = int(match.group("second"))
+
+    logger.debug(f"Time match was successful: {hour=}, {minute=}, {second=}")
 
     return datetime.datetime(year, month, day, hour, minute, second)
 
@@ -457,18 +450,36 @@ def main(args: argparse.Namespace, config: ScriptConfig) -> None:
         raise OSError(f"Input file {args.input} is not a file or directory")
 
 
-def configure_logging() -> None:
+def configure_logging(stdout_level: str = "INFO") -> None:
     logger.remove()  # remove the default hanlder
     logger.add(
         sys.stdout,
         colorize=True,
+        level=stdout_level,
         format="<level>{level}</level> {message}",
     )
 
 
 if __name__ == "__main__":
-    configure_logging()
     args = parse_cli_args()
+
+    configure_logging(
+        stdout_level="DEBUG" if args.verbose else "INFO",
+    )
+
+    if not args.input.exists():
+        logger.error(f"Input file {args.input} is does not exist")
+        sys.exit(1)
+
+    if args.input.is_dir() and args.output.exists() and not args.output.is_dir():
+        logger.error("Input is a directory but output is a file")
+        sys.exit(1)
+
+    if not ASPECT_RATIO_REGEX.match(args.aspect_ratio):
+        logger.error(
+            f"--aspect-ratio: Invalid aspect ratio '{args.aspect_ratio}', must be in the form 'width:height'"
+        )
+        sys.exit(1)
 
     if args.config_file is None:
         config = ScriptConfig()
@@ -476,6 +487,16 @@ if __name__ == "__main__":
             "Using default configuration values, use --config-file to set custom configuration values"
         )
     else:
+        if not args.config_file.is_file():
+            logger.error(f"--config-file: {args.config_file} is not a file")
+            sys.exit(1)
+
+        if args.config_file.suffix != ".toml":
+            logger.error(
+                f"--config-file: {args.config_file} is not a TOML file, must be .toml"
+            )
+            sys.exit(1)
+
         logger.info(f"Loading configuration from {args.config_file.resolve()}")
         config = ScriptConfig.load_from_file(args.config_file)
 
