@@ -172,3 +172,6 @@ bandit.json
 
 # MacOS
 .DS_Store
+
+# Local Testing
+output/

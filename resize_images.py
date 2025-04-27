@@ -66,6 +66,7 @@ TIMESTAMP_PADDING_TOP = 30
 TIMESTAMP_PADDING_BOTTOM = 30
 # ref: https://pillow.readthedocs.io/en/stable/reference/ImageFont.html#PIL.ImageFont.truetype
 TIMESTAMP_FONT_NAME = "Arial Unicode.ttf"
+TIMESTAMP_FALLBACK_FONT_NAME = "FreeSans.ttf"
 TIMESTAMP_FONT_SIZE = 80
 TIMESTAMP_DETECT_TIMEOUT_SECONDS = 5
 
@@ -189,7 +190,12 @@ def draw_timestamp(
     *,
     position: Literal["top left", "top right", "bottom left", "bottom right"],
 ) -> None:
-    timestamp_font = ImageFont.truetype(TIMESTAMP_FONT_NAME, TIMESTAMP_FONT_SIZE)
+    try:
+        timestamp_font = ImageFont.truetype(TIMESTAMP_FONT_NAME, TIMESTAMP_FONT_SIZE)
+    except OSError:
+        timestamp_font = ImageFont.truetype(
+            TIMESTAMP_FALLBACK_FONT_NAME, TIMESTAMP_FONT_SIZE
+        )
 
     if isinstance(timestamp, datetime.date):
         timestamp_text = timestamp.strftime(TIMESTAMP_DATE_FORMAT)
