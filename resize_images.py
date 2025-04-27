@@ -243,10 +243,13 @@ def draw_timestamp(
     position: Literal["top left", "top right", "bottom left", "bottom right"],
     font: ImageFont,
 ) -> None:
-    if isinstance(timestamp, datetime.date):
-        timestamp_text = timestamp.strftime(config.timestamp.date_format)
-    elif isinstance(timestamp, datetime.datetime):
+    # NOTE: It's important to check for datetime first since datetime is a subclass of date
+
+    if isinstance(timestamp, datetime.datetime):
         timestamp_text = timestamp.strftime(config.timestamp.full_format)
+    elif isinstance(timestamp, datetime.date):
+        logger.warning("Only date found in the image, using it as timestamp")
+        timestamp_text = timestamp.strftime(config.timestamp.date_format)
     else:
         raise TypeError(
             f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
@@ -406,11 +409,6 @@ def main(args: argparse.Namespace, config: ScriptConfig) -> None:
             )
 
             if image_timestamp is not None:
-                if isinstance(image_timestamp, datetime.date):
-                    logger.warning(
-                        f"Only date found in {relative_image_path}, using it as timestamp"
-                    )
-
                 draw_timestamp(
                     resized_img,
                     image_timestamp,
@@ -422,7 +420,7 @@ def main(args: argparse.Namespace, config: ScriptConfig) -> None:
             output_image_path.parent.mkdir(parents=True, exist_ok=True)
             resized_img.save(output_image_path.resolve())
 
-            logger.info(f"Completed resizing image {relative_image_path}")
+            logger.info(f"Completed processing image {relative_image_path}")
             processed_images_count += 1
 
     logger.info(f"Processed {processed_images_count} images")
