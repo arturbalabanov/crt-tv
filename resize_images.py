@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.9"
 # dependencies = [
+#     "loguru==0.7.3",
 #     "pillow==11.2.1",
 #     "pytesseract==0.3.13",
 # ]
@@ -15,8 +16,7 @@ import datetime
 
 import pytesseract  # type: ignore[import-not-found]
 from PIL import Image, ImageDraw, ImageFont  # type: ignore[import-untyped]
-
-# TODO: Use logging instead of prints
+from loguru import logger  # type: ignore[import-not-found]
 
 # TODO: Add automatic image rotation
 #       Exif data is not present for these files but a simple check could be
@@ -110,16 +110,16 @@ def parse_cli_args() -> argparse.Namespace:
     args = parser.parse_args()
 
     if not args.input_dir.is_dir():
-        print(f"ERROR --input-dir: {args.input_dir} is not a directory")
+        logger.error(f"--input-dir: {args.input_dir} is not a directory")
         sys.exit(1)
 
     if not args.output_dir.is_dir():
-        print(f"ERROR --output-dir: {args.output_dir} is not a directory")
+        logger.error(f"--output-dir: {args.output_dir} is not a directory")
         sys.exit(1)
 
     if not ASPECT_RATIO_REGEX.match(args.aspect_ratio):
-        print(
-            f"ERROR --aspect-ratio: Invalid aspect ratio '{args.aspect_ratio}', must be in the form 'width:height'"
+        logger.error(
+            f"--aspect-ratio: Invalid aspect ratio '{args.aspect_ratio}', must be in the form 'width:height'"
         )
         sys.exit(1)
 
@@ -307,7 +307,7 @@ def resize_image(
 def main(args: argparse.Namespace) -> None:
     processed_images_count = 0
 
-    print(
+    logger.info(
         f"Resizing images in {args.input_dir} to {args.aspect_ratio} aspect ratio "
         f"using {args.resize_method} method"
     )
@@ -315,17 +315,17 @@ def main(args: argparse.Namespace) -> None:
     for image_path in args.input_dir.glob("**/*.[jJ][pP][gG]"):
         relative_image_path = image_path.relative_to(args.input_dir)
 
-        print(f"Processing {relative_image_path}")
+        logger.info(f"Processing {relative_image_path}")
 
         with Image.open(image_path) as img:
             try:
                 image_timestamp = parse_timestamp_from_image(img)
             except ValueError:
-                print(f"WARNING: No timestamp found in {relative_image_path}")
+                logger.warning(f"No timestamp found in {relative_image_path}")
                 image_timestamp = None
             except RuntimeError:
-                print(
-                    f"WARNING: Tesseract timed out while processing {relative_image_path}"
+                logger.warning(
+                    f"Tesseract timed out while processing {relative_image_path}"
                 )
                 image_timestamp = None
 
@@ -338,8 +338,8 @@ def main(args: argparse.Namespace) -> None:
 
             if image_timestamp is not None:
                 if isinstance(image_timestamp, datetime.date):
-                    print(
-                        f"WARNING: Only date found in {relative_image_path}, using it as timestamp"
+                    logger.warning(
+                        f"Only date found in {relative_image_path}, using it as timestamp"
                     )
 
                 draw_timestamp(
@@ -352,13 +352,22 @@ def main(args: argparse.Namespace) -> None:
             output_image_path.parent.mkdir(parents=True, exist_ok=True)
             resized_img.save(output_image_path.resolve())
 
-            print(f"Completed resizing image {relative_image_path}")
+            logger.info(f"Completed resizing image {relative_image_path}")
             processed_images_count += 1
 
-    print()
-    print(f"Processed {processed_images_count} images")
+    logger.info(f"Processed {processed_images_count} images")
+
+
+def configure_logging() -> None:
+    logger.remove()  # remove the default hanlder
+    logger.add(
+        sys.stdout,
+        colorize=True,
+        format="<level>{level}</level> {message}",
+    )
 
 
 if __name__ == "__main__":
+    configure_logging()
     args = parse_cli_args()
     main(args)
