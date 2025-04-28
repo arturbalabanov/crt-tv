@@ -1,0 +1,51 @@
+[project]
+name = "crt-tv"
+version = "0.1.0"
+authors = [{ name = "Artur Balabanov", email = "arturbalabanov97@gmail.com" }]
+description = "A collection of scripts I'm running on a Raspberry Pi connected to a CRT TV"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "loguru>=0.7.3, <1.0.0",
+    "pillow>=11.2.1, <12.0.0",
+    "pydantic>=2.11.3, <3.0.0",
+    "pytesseract>=0.3.13, <1.0.0",
+]
+
+[dependency-groups]
+dev = ["mypy>=1.15.0", "ruff>=0.11.7"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "F",   # pyflakes
+    "E",   # pycodestyle
+    "W",   # pycodestyle
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "YTT", # flake8-2020
+    "PT",  # flake8-pytest-style
+    "PTH", # flake8-use-pathlib
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "PGH", # pygrep-hooks
+    "RUF", # ruff
+    "I",   # isort
+]
+ignore = [
+    "N818",   # error-suffix-on-exception-name
+    "PGH003", # Use specific rule codes when ignoring type issues
+    "UP040",  # (ignored because mypy doesn't support it yet) prefer type over TypeAlias
+]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.mypy]
+warn_no_return = false
+ignore_missing_imports = true

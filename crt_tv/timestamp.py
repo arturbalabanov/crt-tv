@@ -1,0 +1,184 @@
+import datetime
+import pathlib
+import re
+from typing import Literal
+
+import pytesseract
+from loguru import logger
+from PIL.Image import Image
+from PIL.ImageDraw import Draw
+from PIL.ImageFont import FreeTypeFont, truetype
+
+from crt_tv.config import Config
+
+# The timestamp from the image, e.g. 2024/11/06 19:49:09
+# Sometimes only part of it is visivle against the background, in which case
+# as long as the date is visible, it's good enough to use it
+TIMESTAMP_PARSE_REGEX = re.compile(
+    r"""
+        (?P<year>\d{4})            # Match the year
+        \s*/\s*                    # Followed by /
+        (?P<month>\d{2})           # Match the month
+        \s*/\s*                    # Followed by /
+        (?P<day>\d{2})             # Match the day
+        (?P<time>                  # Optionally, match the time
+            \s+
+            (?P<hour>\d{2})        # Match the hour
+            \s*:\s*                # Followed by :
+            (?P<minute>\d{2})      # Match the minute
+            \s*:\s*                # Followed by :
+            (?P<second>\d{2})      # Match the second
+        )?
+    """,
+    re.VERBOSE,
+)
+
+
+def parse_timestamp_from_image(
+    img: Image,
+    config: Config,
+    img_file_path: pathlib.Path,
+    failed_timestamp_extracts_dir: pathlib.Path | None,
+) -> datetime.datetime | datetime.date:
+    logger.debug("Cutting the bottom left corner of the image to extract the timestamp")
+
+    img_width, img_height = img.size
+    timestamp_region = img.crop((0, img_height - 100, 1000, img_height))
+
+    logger.debug("Extracting all text from from the cut part of the image")
+
+    extracted_text = pytesseract.image_to_string(timestamp_region, timeout=config.timestamp.detect_timeout_seconds)
+
+    logger.debug(f"Extracted text: '{extracted_text}'")
+
+    match = TIMESTAMP_PARSE_REGEX.search(extracted_text)
+
+    if failed_timestamp_extracts_dir and (not match or match.group("time") is None):
+        logger.debug(
+            f"Couldn't extract the timestamp, saving the cut part of the image to {failed_timestamp_extracts_dir}"
+        )
+
+        failed_timestamp_extracts_dir.mkdir(parents=True, exist_ok=True)
+
+        output_image_path = failed_timestamp_extracts_dir / img_file_path.name
+        timestamp_region.save(output_image_path)
+
+        logger.info(f"Saved cut part of the image to {output_image_path}")
+
+    if not match:
+        logger.debug("No timestamp match was found in the image")
+        raise ValueError("No datetime found in the image")
+
+    year = int(match.group("year"))
+    month = int(match.group("month"))
+    day = int(match.group("day"))
+
+    logger.debug(f"Date match was successful: {year=}, {month=}, {day=}")
+
+    if match.group("time") is None:
+        logger.debug("Couldn't extract the time compontents, using only the date")
+
+        return datetime.date(year, month, day)
+
+    hour = int(match.group("hour"))
+    minute = int(match.group("minute"))
+    second = int(match.group("second"))
+
+    logger.debug(f"Time match was successful: {hour=}, {minute=}, {second=}")
+
+    return datetime.datetime(year, month, day, hour, minute, second)
+
+
+def draw_timestamp(
+    img: Image,
+    timestamp: datetime.datetime | datetime.date,
+    *,
+    position: Literal["top left", "top right", "bottom left", "bottom right"],
+    font: FreeTypeFont,
+    config: Config,
+) -> None:
+    # NOTE: It's important to check for datetime first since datetime is a subclass of date
+
+    if isinstance(timestamp, datetime.datetime):
+        timestamp_text = timestamp.strftime(config.timestamp.full_format)
+    elif isinstance(timestamp, datetime.date):
+        logger.warning("Only date found in the image, using it as timestamp")
+        timestamp_text = timestamp.strftime(config.timestamp.date_format)
+    else:
+        raise TypeError(f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}")
+
+    draw = Draw(img)
+    text_bbox_left, text_bbox_top, text_bbox_right, text_bbox_bottom = draw.textbbox(
+        xy=(0, 0),
+        text=timestamp_text,
+        font=font,
+    )
+
+    text_width = text_bbox_right - text_bbox_left
+    text_height = text_bbox_bottom - text_bbox_top
+
+    left_x = 0
+    right_x = int(
+        img.width
+        - text_width
+        - config.timestamp.margin_left
+        - config.timestamp.margin_right
+        - config.timestamp.padding_left
+        - config.timestamp.padding_right
+    )
+    top_y = 0
+    bottom_y = int(
+        img.height
+        - text_height
+        - config.timestamp.margin_top
+        - config.timestamp.margin_bottom
+        - config.timestamp.padding_top
+        - config.timestamp.padding_bottom
+    )
+
+    if position == "top left":
+        timestamp_x, timestamp_y = (left_x, top_y)
+    elif position == "top right":
+        timestamp_x, timestamp_y = (right_x, top_y)
+    elif position == "bottom left":
+        timestamp_x, timestamp_y = (left_x, bottom_y)
+    elif position == "bottom right":
+        timestamp_x, timestamp_y = (right_x, bottom_y)
+    else:
+        raise ValueError(
+            f"Invalid position '{position}', must be 'top left', 'top right', 'bottom left', or 'bottom right'"
+        )
+
+    bg_rect_left = timestamp_x + config.timestamp.margin_left
+    bg_rect_top = timestamp_y + config.timestamp.margin_top
+    bg_rect_right = bg_rect_left + config.timestamp.padding_left + text_width + config.timestamp.padding_right
+    bg_rect_bottom = bg_rect_top + config.timestamp.padding_top + text_height + config.timestamp.padding_bottom
+
+    text_x = bg_rect_left + config.timestamp.padding_left
+    text_y = bg_rect_top - text_bbox_top + config.timestamp.padding_top
+
+    draw.rectangle(
+        (bg_rect_left, bg_rect_top, bg_rect_right, bg_rect_bottom),
+        fill=config.timestamp.bg_color,
+    )
+    draw.text(
+        xy=(text_x, text_y),
+        text=timestamp_text,
+        fill=config.timestamp.fg_color,
+        font=font,
+    )
+
+
+def get_timestamp_font(config: Config) -> FreeTypeFont:
+    logger.info("Searching for timestamp font")
+
+    for font_name in config.timestamp.font_names:
+        try:
+            font = truetype(font_name, config.timestamp.font_size)
+        except OSError:
+            logger.warning(f"Font '{font_name}' not found, trying next font")
+        else:
+            logger.info(f"Using timestamp font: {font_name}")
+            return font
+
+    raise OSError(f"None of the fonts {config.timestamp.font_names} were found")
