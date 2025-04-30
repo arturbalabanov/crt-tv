@@ -1,54 +1,16 @@
-import argparse
 import pathlib
-import sys
+from typing import Annotated, TypedDict
 
+import typer
 from loguru import logger
 from PIL.Image import open as image_open
 from PIL.ImageFont import FreeTypeFont
 
 from crt_tv.config import Config
+from crt_tv.logging import configure_logging
 from crt_tv.resize_images import resize_image
 from crt_tv.timestamp import draw_timestamp, get_timestamp_font, parse_timestamp_from_image
 from crt_tv.utils import get_output_image_path
-
-
-def parse_cli_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        prog="crt-tv",
-        description="Resize images into a different aspect ratio",
-    )
-    parser.add_argument(
-        "--config-file",
-        type=pathlib.Path,
-        help="Path to the configuration file (in TOML format) if not using the default values",
-        required=True,
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        dest="verbose",
-        help="Enable DEBUG logs in the output",
-        default=False,
-    )
-    return parser.parse_args()
-
-
-def get_config(config_file_path: pathlib.Path) -> Config:
-    if not config_file_path.is_absolute():
-        logger.error(f"--config-file: {config_file_path} is not an absolute path")
-        sys.exit(1)
-
-    if not config_file_path.is_file():
-        logger.error(f"--config-file: {config_file_path} is not a file")
-        sys.exit(1)
-
-    if config_file_path.suffix != ".toml":
-        logger.error(f"--config-file: {config_file_path} is not a TOML file, must be .toml")
-        sys.exit(1)
-
-    logger.info(f"Loading configuration from {config_file_path.resolve()}")
-    return Config.load_from_file(config_file_path)
 
 
 def process_single_file(image_path: pathlib.Path, config: Config, timestamp_font: FreeTypeFont) -> pathlib.Path:
@@ -61,7 +23,7 @@ def process_single_file(image_path: pathlib.Path, config: Config, timestamp_font
             logger.warning(f"No timestamp found in {image_path.name}")
             image_timestamp = None
         except RuntimeError:
-            logger.warning(f"Tesseract timed out while processing {image_path.name}")
+            logger.warning(f"Tesseract timed out while processing {image_path.name}", exc_info=True)
             image_timestamp = None
 
         resized_img = resize_image(
@@ -86,7 +48,64 @@ def process_single_file(image_path: pathlib.Path, config: Config, timestamp_font
     return output_image_path
 
 
-def main(config: Config) -> None:
+class CLIState(TypedDict):
+    verbose: bool
+    config: Config
+
+
+app = typer.Typer(name="crt-tv", help="A collection of scripts I'm running on a Raspberry Pi connected to a CRT TV")
+
+
+cli_state: CLIState = {
+    "verbose": False,
+    "config": None,  # type: ignore[typeddict-item]
+}
+
+
+@app.callback()
+def main(
+    config_file: Annotated[
+        pathlib.Path,
+        typer.Option(
+            "-c",
+            "--config-file",
+            help="Path to the configuration file (in TOML format)",
+        ),
+    ],
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Enable DEBUG logs in the output",
+            is_eager=True,
+        ),
+    ] = False,
+) -> None:
+    if verbose:
+        cli_state["verbose"] = True
+
+    configure_logging(stdout_level="DEBUG" if verbose else "INFO")
+
+    if not config_file.is_absolute():
+        raise typer.BadParameter(f"{config_file} is not an absolute path", param=config_file)
+
+    if not config_file.is_file():
+        raise typer.BadParameter(f"{config_file} is not a file", param=config_file)
+
+    if config_file.suffix != ".toml":
+        raise typer.BadParameter(f"{config_file} is not a TOML file, must be .toml", param=config_file)
+
+    logger.info(f"Loading configuration from {config_file}")
+    cli_state["config"] = Config.load_from_file(config_file)
+
+
+@app.command()
+def process_images() -> None:
+    """Resize images in the source directory to the specified aspect ratio and optionally add a timestamp"""
+
+    config = cli_state["config"]
+
     logger.info(
         f"Resizing images in {config.source_files_dir} to {config.aspect_ratio} aspect ratio "
         f"using {config.resize_method} method"
@@ -107,3 +126,24 @@ def main(config: Config) -> None:
         processed_images_count += 1
 
     logger.info(f"Processed {processed_images_count} images")
+
+
+@app.command()
+def get_timestamp(file: pathlib.Path) -> None:
+    """Get the timestamp from an image"""
+
+    config = cli_state["config"]
+
+    logger.info(f"Getting timestamp from {file.name}")
+
+    with image_open(file) as img:
+        try:
+            image_timestamp = parse_timestamp_from_image(img, config, file)
+        except ValueError:
+            logger.warning(f"No timestamp found in {file.name}")
+            image_timestamp = None
+        except RuntimeError as exc:
+            logger.warning(f"Tesseract timed out while processing {file.name}", exc_info=True)
+            raise typer.Exit(code=1) from exc
+
+    logger.info(f"Timestamp found: {image_timestamp}")

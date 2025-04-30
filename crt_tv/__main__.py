@@ -1,9 +1,4 @@
-import sys
-
-from loguru import logger
-
-from crt_tv.cli import get_config, main, parse_cli_args
-from crt_tv.logging import configure_logging
+from crt_tv import cli
 
 # TODO: Add automatic image rotation
 #       Exif data is not present for these files but a simple check could be
@@ -22,13 +17,4 @@ from crt_tv.logging import configure_logging
 # TODO: Add support for videos
 
 
-args = parse_cli_args()
-
-configure_logging(stdout_level="DEBUG" if args.verbose else "INFO")
-config = get_config(args.config_file)
-
-try:
-    main(config)
-except KeyboardInterrupt:
-    logger.warning("Process interrupted by user, partial results may be present in the output")
-    sys.exit(130)
+cli.app()
