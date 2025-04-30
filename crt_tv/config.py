@@ -1,9 +1,12 @@
 import pathlib
 import textwrap
 import tomllib
-from typing import Self
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field
+from loguru import logger
+from pydantic import BaseModel, Field, field_validator
+
+from crt_tv.resize_images import ASPECT_RATIO_REGEX
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 ASSETS_DIR = PROJECT_ROOT / "assets"
@@ -17,6 +20,15 @@ DEFAULT_FONTS: list[str | pathlib.Path] = [
 
 
 class TimestampConfig(BaseModel):
+    position: Literal["top left", "top right", "bottom left", "bottom right"] = Field(
+        default="bottom right",
+        description="Position of the timestamp to be appended to the image",
+    )
+
+    failed_timestamp_extracts_dir: pathlib.Path | None = Field(
+        default=None,
+        description="A directory which will contain the cut parts of the images where the timestamp extraction failed",
+    )
     date_format: str = "%-d %b %Y"  # e.g. 6 Nov 2024
     full_format: str = "%-d %b %Y %H:%M:%S"  # e.g. 6 Nov 2024 19:49:02
     fg_color: str | tuple[int, int, int] = "white"
@@ -39,9 +51,69 @@ class TimestampConfig(BaseModel):
     font_size: int = 80
     detect_timeout_seconds: int = 30
 
+    @field_validator("failed_timestamp_extracts_dir")
+    @classmethod
+    def validate_failed_timestamp_extracts_dir(cls, value: pathlib.Path | None) -> pathlib.Path | None:
+        if value is None:
+            return None
+
+        if not value.is_absolute():
+            raise ValueError(f"failed_timestamp_extracts_dir: Path must be absolute: {value}")
+
+        if not value.exists():
+            logger.info(f"failed_timestamp_extracts_dir: Directory does not exist, creating: {value}")
+            value.mkdir(parents=True, exist_ok=True)
+        elif not value.is_dir():
+            raise ValueError(f"failed_timestamp_extracts_dir: Path is not a directory: {value}")
+
+        return value
+
 
 class Config(BaseModel):
+    source_files_dir: pathlib.Path
+    output_files_dir: pathlib.Path
+    aspect_ratio: str
+    resize_method: Literal["stretch", "crop"]
     timestamp: TimestampConfig = Field(default_factory=TimestampConfig)
+
+    @field_validator("source_files_dir")
+    @classmethod
+    def validate_source_files_dir(cls, value: pathlib.Path) -> pathlib.Path:
+        if not value.is_absolute():
+            raise ValueError(f"source_files_dir: Path must be absolute: {value}")
+
+        if not value.exists():
+            raise ValueError(f"source_files_dir: Directory does not exist: {value}")
+
+        if not value.is_dir():
+            raise ValueError(f"source_files_dir: Path is not a directory: {value}")
+
+        return value
+
+    @field_validator("output_files_dir")
+    @classmethod
+    def validate_output_files_dir(cls, value: pathlib.Path) -> pathlib.Path:
+        if not value.is_absolute():
+            raise ValueError(f"output_files_dir: Path must be absolute: {value}")
+
+        if not value.exists():
+            logger.info(f"output_files_dir: Directory does not exist, creating: {value}")
+            value.mkdir(parents=True, exist_ok=True)
+        elif not value.is_dir():
+            raise ValueError(f"output_files_dir: Path is not a directory: {value}")
+
+        if not value.is_absolute():
+            raise ValueError(f"output_files_dir: Path must be absolute: {value}")
+
+        return value
+
+    @field_validator("aspect_ratio")
+    @classmethod
+    def validate_aspect_ratio(cls, value: str) -> str:
+        if not ASPECT_RATIO_REGEX.match(value):
+            raise ValueError(f"Invalid aspect ratio '{value}', must be in the form 'width:height' (e.g. '4:3')")
+
+        return value
 
     @classmethod
     def load_from_file(cls, file_path: pathlib.Path) -> Self:

@@ -2,7 +2,7 @@ import sys
 
 from loguru import logger
 
-from crt_tv.cli import main, parse_cli_args, validate_cli_args
+from crt_tv.cli import get_config, main, parse_cli_args
 from crt_tv.logging import configure_logging
 
 # TODO: Add automatic image rotation
@@ -25,10 +25,10 @@ from crt_tv.logging import configure_logging
 args = parse_cli_args()
 
 configure_logging(stdout_level="DEBUG" if args.verbose else "INFO")
-config = validate_cli_args(args)
+config = get_config(args.config_file)
 
 try:
-    main(args, config)
+    main(config)
 except KeyboardInterrupt:
     logger.warning("Process interrupted by user, partial results may be present in the output")
     sys.exit(130)

@@ -11,7 +11,7 @@ def get_new_dimensions(
     orig_height: int,
     new_aspect_ratio: str,
     resize_method: Literal["stretch", "crop"],
-):
+) -> tuple[int, int]:
     aspect_ratio_match = ASPECT_RATIO_REGEX.match(new_aspect_ratio)
 
     if not aspect_ratio_match:
@@ -37,12 +37,7 @@ def get_new_dimensions(
     return new_width, new_height
 
 
-def resize_image(
-    img: Image,
-    new_aspect_ratio: str,
-    *,
-    resize_method: Literal["stretch", "crop"],
-) -> Image:
+def resize_image(img: Image, new_aspect_ratio: str, *, resize_method: Literal["stretch", "crop"]) -> Image:
     orig_width, orig_height = img.size
 
     new_width, new_height = get_new_dimensions(

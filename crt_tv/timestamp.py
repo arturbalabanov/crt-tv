@@ -1,7 +1,6 @@
 import datetime
 import pathlib
 import re
-from typing import Literal
 
 import pytesseract
 from loguru import logger
@@ -38,7 +37,6 @@ def parse_timestamp_from_image(
     img: Image,
     config: Config,
     img_file_path: pathlib.Path,
-    failed_timestamp_extracts_dir: pathlib.Path | None,
 ) -> datetime.datetime | datetime.date:
     logger.debug("Cutting the bottom left corner of the image to extract the timestamp")
 
@@ -52,6 +50,8 @@ def parse_timestamp_from_image(
     logger.debug(f"Extracted text: '{extracted_text}'")
 
     match = TIMESTAMP_PARSE_REGEX.search(extracted_text)
+
+    failed_timestamp_extracts_dir = config.timestamp.failed_timestamp_extracts_dir
 
     if failed_timestamp_extracts_dir and (not match or match.group("time") is None):
         logger.debug(
@@ -93,7 +93,6 @@ def draw_timestamp(
     img: Image,
     timestamp: datetime.datetime | datetime.date,
     *,
-    position: Literal["top left", "top right", "bottom left", "bottom right"],
     font: FreeTypeFont,
     config: Config,
 ) -> None:
@@ -136,18 +135,17 @@ def draw_timestamp(
         - config.timestamp.padding_bottom
     )
 
-    if position == "top left":
-        timestamp_x, timestamp_y = (left_x, top_y)
-    elif position == "top right":
-        timestamp_x, timestamp_y = (right_x, top_y)
-    elif position == "bottom left":
-        timestamp_x, timestamp_y = (left_x, bottom_y)
-    elif position == "bottom right":
-        timestamp_x, timestamp_y = (right_x, bottom_y)
-    else:
-        raise ValueError(
-            f"Invalid position '{position}', must be 'top left', 'top right', 'bottom left', or 'bottom right'"
-        )
+    match config.timestamp.position:
+        case "top left":
+            timestamp_x, timestamp_y = (left_x, top_y)
+        case "top right":
+            timestamp_x, timestamp_y = (right_x, top_y)
+        case "bottom left":
+            timestamp_x, timestamp_y = (left_x, bottom_y)
+        case "bottom right":
+            timestamp_x, timestamp_y = (right_x, bottom_y)
+        case _:
+            raise RuntimeError("invalid branch")
 
     bg_rect_left = timestamp_x + config.timestamp.margin_left
     bg_rect_top = timestamp_y + config.timestamp.margin_top
