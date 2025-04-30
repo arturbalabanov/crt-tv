@@ -9,6 +9,7 @@ from PIL.ImageFont import FreeTypeFont
 from crt_tv.config import Config
 from crt_tv.resize_images import resize_image
 from crt_tv.timestamp import draw_timestamp, get_timestamp_font, parse_timestamp_from_image
+from crt_tv.utils import get_output_image_path
 
 
 def parse_cli_args() -> argparse.Namespace:
@@ -50,12 +51,7 @@ def get_config(config_file_path: pathlib.Path) -> Config:
     return Config.load_from_file(config_file_path)
 
 
-def process_single_file(
-    image_path: pathlib.Path,
-    config: Config,
-    timestamp_font: FreeTypeFont,
-    output_image_path: pathlib.Path,
-) -> None:
+def process_single_file(image_path: pathlib.Path, config: Config, timestamp_font: FreeTypeFont) -> pathlib.Path:
     logger.info(f"Processing {image_path.name}")
 
     with image_open(image_path) as img:
@@ -82,9 +78,12 @@ def process_single_file(
                 config=config,
             )
 
-        resized_img.save(output_image_path.resolve())
+        output_image_path = get_output_image_path(image_path, config).resolve()
+        resized_img.save(output_image_path)
 
-        logger.info(f"Completed processing image {image_path.name}")
+    logger.info(f"Completed processing image {image_path.name}")
+
+    return output_image_path
 
 
 def main(config: Config) -> None:
@@ -103,7 +102,7 @@ def main(config: Config) -> None:
         output_image_path = config.output_files_dir / relative_image_path
         output_image_path.parent.mkdir(parents=True, exist_ok=True)
 
-        process_single_file(image_path, config, timestamp_font, output_image_path)
+        process_single_file(image_path, config, timestamp_font)
 
         processed_images_count += 1
 
