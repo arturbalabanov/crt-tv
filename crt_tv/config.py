@@ -22,7 +22,7 @@ DEFAULT_FONTS: list[str | pathlib.Path] = [
 
 class TimestampConfig(BaseModel):
     position: Literal["top left", "top right", "bottom left", "bottom right"] = Field(
-        default="bottom right",
+        default="bottom left",
         description="Position of the timestamp to be appended to the image",
     )
 
