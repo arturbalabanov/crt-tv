@@ -4,48 +4,12 @@ from typing import Annotated, TypedDict
 import typer
 from loguru import logger
 from PIL.Image import open as image_open
-from PIL.ImageFont import FreeTypeFont
 
 from crt_tv.config import Config
+from crt_tv.fs_observer import observe_and_action_fs_events
+from crt_tv.images import process_single_image
 from crt_tv.logging import configure_logging
-from crt_tv.resize_images import resize_image
-from crt_tv.timestamp import draw_timestamp, get_timestamp_font, parse_timestamp_from_image
-from crt_tv.utils import get_output_image_path
-
-
-def process_single_file(image_path: pathlib.Path, config: Config, timestamp_font: FreeTypeFont) -> pathlib.Path:
-    logger.info(f"Processing {image_path.name}")
-
-    with image_open(image_path) as img:
-        try:
-            image_timestamp = parse_timestamp_from_image(img, config, image_path)
-        except ValueError:
-            logger.warning(f"No timestamp found in {image_path.name}")
-            image_timestamp = None
-        except RuntimeError:
-            logger.warning(f"Tesseract timed out while processing {image_path.name}", exc_info=True)
-            image_timestamp = None
-
-        resized_img = resize_image(
-            img,
-            new_aspect_ratio=config.aspect_ratio,
-            resize_method=config.resize_method,
-        )
-
-        if image_timestamp is not None:
-            draw_timestamp(
-                resized_img,
-                image_timestamp,
-                font=timestamp_font,
-                config=config,
-            )
-
-        output_image_path = get_output_image_path(image_path, config).resolve()
-        resized_img.save(output_image_path)
-
-    logger.info(f"Completed processing image {image_path.name}")
-
-    return output_image_path
+from crt_tv.timestamp import get_timestamp_font, parse_timestamp_from_image
 
 
 class CLIState(TypedDict):
@@ -121,7 +85,7 @@ def process_images() -> None:
         output_image_path = config.output_files_dir / relative_image_path
         output_image_path.parent.mkdir(parents=True, exist_ok=True)
 
-        process_single_file(image_path, config, timestamp_font)
+        process_single_image(image_path, config, timestamp_font)
 
         processed_images_count += 1
 
@@ -147,3 +111,17 @@ def get_timestamp(file: pathlib.Path) -> None:
             raise typer.Exit(code=1) from exc
 
     logger.info(f"Timestamp found: {image_timestamp}")
+
+
+@app.command()
+def run_observer(
+    recursive: Annotated[bool, typer.Option(help="Should the observer check for files in nested directories")] = True,
+    sleep_time: Annotated[float, typer.Option(help="How often (in seconds) to check for fs events")] = 0.1,
+) -> None:
+    """Run the file system observer to automatically process images from the source directory"""
+
+    config = cli_state["config"]
+
+    logger.info(f"Running file system observer for {config.source_files_dir}")
+
+    observe_and_action_fs_events(config, recursive=True)

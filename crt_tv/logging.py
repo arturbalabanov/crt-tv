@@ -3,6 +3,8 @@ import sys
 from loguru import logger
 
 # TODO: Add a critical error hanlder to send me an email
+# TODO: Add logging configuration to send logs to a file
+# TODO: Set up log rotation
 
 
 def configure_logging(stdout_level: str = "INFO") -> None:

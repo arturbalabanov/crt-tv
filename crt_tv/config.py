@@ -1,4 +1,5 @@
 import pathlib
+import re
 import textwrap
 import tomllib
 from typing import Literal, Self
@@ -6,7 +7,7 @@ from typing import Literal, Self
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 
-from crt_tv.resize_images import ASPECT_RATIO_REGEX
+ASPECT_RATIO_REGEX = re.compile(r"^(?P<width>\d+):(?P<height>\d+)$")
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 ASSETS_DIR = PROJECT_ROOT / "assets"

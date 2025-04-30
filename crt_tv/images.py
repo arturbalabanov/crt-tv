@@ -1,9 +1,49 @@
-import re
+import pathlib
 from typing import Literal
 
+from loguru import logger
 from PIL.Image import Image
+from PIL.Image import open as image_open
+from PIL.ImageFont import FreeTypeFont
 
-ASPECT_RATIO_REGEX = re.compile(r"^(?P<width>\d+):(?P<height>\d+)$")
+from crt_tv.config import ASPECT_RATIO_REGEX, Config
+from crt_tv.timestamp import draw_timestamp, parse_timestamp_from_image
+from crt_tv.utils import get_output_image_path
+
+
+def process_single_image(image_path: pathlib.Path, config: Config, timestamp_font: FreeTypeFont) -> pathlib.Path:
+    logger.info(f"Processing {image_path.name}")
+
+    with image_open(image_path) as img:
+        try:
+            image_timestamp = parse_timestamp_from_image(img, config, image_path)
+        except ValueError:
+            logger.warning(f"No timestamp found in {image_path.name}")
+            image_timestamp = None
+        except RuntimeError:
+            logger.warning(f"Tesseract timed out while processing {image_path.name}", exc_info=True)
+            image_timestamp = None
+
+        resized_img = resize_image(
+            img,
+            new_aspect_ratio=config.aspect_ratio,
+            resize_method=config.resize_method,
+        )
+
+        if image_timestamp is not None:
+            draw_timestamp(
+                resized_img,
+                image_timestamp,
+                font=timestamp_font,
+                config=config,
+            )
+
+        output_image_path = get_output_image_path(image_path, config).resolve()
+        resized_img.save(output_image_path)
+
+    logger.info(f"Completed processing image {image_path.name}")
+
+    return output_image_path
 
 
 def get_new_dimensions(

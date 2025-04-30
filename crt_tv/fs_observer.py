@@ -12,8 +12,8 @@ from watchdog.events import (
 )
 from watchdog.observers import Observer
 
-from crt_tv.cli import process_single_file
 from crt_tv.config import Config
+from crt_tv.images import process_single_image
 from crt_tv.timestamp import get_timestamp_font
 from crt_tv.utils import get_output_image_path
 
@@ -21,6 +21,10 @@ from crt_tv.utils import get_output_image_path
 #       * on_modified: reload it
 #       * on_delete: log a critical error and abort
 #       * on_moved: log a warning
+
+
+# TODO: Add exception handling for the handler/observer -- it's running in a seperate thread
+#       which is why it's not automatic
 
 
 class SourceFileEventHanlder(PatternMatchingEventHandler):
@@ -34,7 +38,7 @@ class SourceFileEventHanlder(PatternMatchingEventHandler):
 
     def _try_process_file(self, file_path: pathlib.Path) -> None:
         try:
-            dest_path = process_single_file(file_path, self.config, get_timestamp_font(self.config))
+            dest_path = process_single_image(file_path, self.config, get_timestamp_font(self.config))
         except Exception:
             logger.exception(f"Error processing file {file_path}")
         else:
@@ -66,6 +70,8 @@ class SourceFileEventHanlder(PatternMatchingEventHandler):
         self._try_process_file(file_path)
 
     def on_moved(self, event: FileMovedEvent) -> None:
+        # TODO: If moved outside of the source directory, delete the processed file
+
         old_file_path = pathlib.Path(event.src_path)
         new_file_path = pathlib.Path(event.dest_path)
 

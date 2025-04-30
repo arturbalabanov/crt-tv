@@ -54,16 +54,16 @@ def parse_timestamp_from_image(
     failed_timestamp_extracts_dir = config.timestamp.failed_timestamp_extracts_dir
 
     if failed_timestamp_extracts_dir and (not match or match.group("time") is None):
-        logger.debug(
-            f"Couldn't extract the timestamp, saving the cut part of the image to {failed_timestamp_extracts_dir}"
-        )
+        timestamp_path = failed_timestamp_extracts_dir / img_file_path.name
+        relative_timestamp_path = timestamp_path.relative_to(failed_timestamp_extracts_dir.parent)
+
+        logger.info(f"Couldn't extract the timestamp, saving the cut part of the image to {relative_timestamp_path}")
 
         failed_timestamp_extracts_dir.mkdir(parents=True, exist_ok=True)
 
-        output_image_path = failed_timestamp_extracts_dir / img_file_path.name
-        timestamp_region.save(output_image_path)
+        timestamp_region.save(timestamp_path.resolve())
 
-        logger.info(f"Saved cut part of the image to {output_image_path}")
+        logger.info(f"Saved cut part of the image to {relative_timestamp_path}")
 
     if not match:
         logger.debug("No timestamp match was found in the image")

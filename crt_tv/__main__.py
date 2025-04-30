@@ -16,5 +16,7 @@ from crt_tv import cli
 
 # TODO: Add support for videos
 
+# TODO: Add a systemd service for the fs ovserver
+
 
 cli.app()
