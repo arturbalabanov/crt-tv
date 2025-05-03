@@ -34,6 +34,7 @@ def main(
             "-c",
             "--config-file",
             help="Path to the configuration file (in TOML format)",
+            default_factory=lambda: pathlib.Path.home() / ".config" / "crt-tv.toml",
         ),
     ],
     verbose: Annotated[
@@ -52,13 +53,13 @@ def main(
     configure_logging(stdout_level="DEBUG" if verbose else "INFO")
 
     if not config_file.is_absolute():
-        raise typer.BadParameter(f"{config_file} is not an absolute path", param=config_file)
+        raise typer.BadParameter(f"--config-file: {config_file} is not an absolute path")
 
     if not config_file.is_file():
-        raise typer.BadParameter(f"{config_file} is not a file", param=config_file)
+        raise typer.BadParameter(f"--config-file: {config_file} is not a file")
 
     if config_file.suffix != ".toml":
-        raise typer.BadParameter(f"{config_file} is not a TOML file, must be .toml", param=config_file)
+        raise typer.BadParameter(f"--config-file: {config_file} is not a TOML file, must be .toml")
 
     logger.info(f"Loading configuration from {config_file}")
     cli_state["config"] = Config.load_from_file(config_file)
