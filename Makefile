@@ -39,6 +39,11 @@ service-logs:  ## Show the logs of the systemd service
 service-status:  ## Show the logs of the systemd service
 	TERM=xterm ssh -t "$(SSH_HOST)" "systemctl status $(SYSTEMD_SERVICE_NAME)"
 
+.PHONY: install
+install:  ## Install the CLI tool locally
+	uv tool install . --editable --force
+
+
 .PHONY: lint
 lint:  ## Run the linters and the type checker
 	uv run ruff format --check --diff .

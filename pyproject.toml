@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = [{ name = "Artur Balabanov", email = "arturbalabanov97@gmail.com" }]
 description = "A collection of scripts I'm running on a Raspberry Pi connected to a CRT TV"
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "loguru>=0.7.3, <1.0.0",
@@ -17,6 +17,15 @@ dependencies = [
 
 [dependency-groups]
 dev = ["mypy>=1.15.0", "ruff>=0.11.7"]
+
+[project.scripts]
+crt-tv = "crt_tv.cli:app"
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+py-modules = ["crt_tv"]
 
 [tool.ruff]
 line-length = 120
