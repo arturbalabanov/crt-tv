@@ -69,6 +69,7 @@ class SourceFileEventHanlder(PatternMatchingEventHandler):
         self._try_process_file(file_path)
 
     def on_modified(self, event: FileModifiedEvent) -> None:
+        # TODO: Check that the file was actually different (otherwise simply opening them remotely triggers this)
         file_path = pathlib.Path(event.src_path)
         logger.debug(f"Detected file modified: {file_path}")
         self._try_process_file(file_path)

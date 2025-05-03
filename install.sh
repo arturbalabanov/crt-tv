@@ -11,6 +11,10 @@ cp "$service_name" "/etc/systemd/system/$service_name"
 chown root:root $service_path
 chmod 644 $service_path
 
+if systemctl is-active --quiet $service_name; then
+    systemctl stop $service_name
+fi
+
 systemctl daemon-reload
 systemctl enable $service_name
 systemctl start $service_name
