@@ -7,13 +7,13 @@ service_path="/etc/systemd/system/$service_name"
 
 uv tool install . --editable --reinstall
 
-cp "$service_name" "/etc/systemd/system/$service_name"
-chown root:root $service_path
-chmod 644 $service_path
-
 if systemctl is-active --quiet $service_name; then
     systemctl stop $service_name
 fi
+
+cp "$service_name" "/etc/systemd/system/$service_name"
+chown root:root $service_path
+chmod 644 $service_path
 
 systemctl daemon-reload
 systemctl enable $service_name
