@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 
 SSH_HOST = crt
+SYSTEMD_SERVICE_NAME = crt_tv_fs_observer.service
 
 .PHONY: help
 help:  ## Generates a help README
