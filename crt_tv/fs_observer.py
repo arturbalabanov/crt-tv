@@ -37,6 +37,10 @@ class SourceFileEventHanlder(PatternMatchingEventHandler):
         self.config = config
 
     def _try_process_file(self, file_path: pathlib.Path) -> None:
+        if file_path.name.startswith("."):
+            logger.debug(f"Skipping hidden file {file_path}")
+            return
+
         try:
             dest_path = process_single_image(file_path, self.config, get_timestamp_font(self.config))
         except Exception:
