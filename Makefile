@@ -18,7 +18,7 @@ clean:  ## Remove the build artifacts
 deploy:  clean ## Deploy the project to the remote host
 	ssh "$(SSH_HOST)" "rm -rf /tmp/crt-tv"
 	ssh "$(SSH_HOST)" "git clone https://github.com/arturbalabanov/crt-tv/ /tmp/crt-tv"
-	ssh "$(SSH_HOST)" "/tmp/crt-tv/install.sh"
+	ssh "$(SSH_HOST)" "cd /tmp/crt-tv && ./install.sh"
 	ssh "$(SSH_HOST)" "rm -rf /tmp/crt-tv"
 
 .PHONY: service-logs
