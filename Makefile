@@ -1,9 +1,6 @@
 .DEFAULT_GOAL := help
 
 SSH_HOST = crt
-REMOTE_PROJECT_PATH = /root/.local/share/crt-tv
-SYSTEMD_SERVICE_NAME = crt_tv_fs_observer.service
-REMOTE_SYSTEMD_SEVERICE_PATH = /etc/systemd/system/$(SYSTEMD_SERVICE_NAME)
 
 .PHONY: help
 help:  ## Generates a help README
@@ -19,17 +16,10 @@ clean:  ## Remove the build artifacts
 	
 .PHONY: deploy
 deploy:  clean ## Deploy the project to the remote host
-	ssh "$(SSH_HOST)" "mkdir -p $(REMOTE_PROJECT_PATH)"
-	scp pyproject.toml "$(SSH_HOST):$(REMOTE_PROJECT_PATH)"
-	scp uv.lock "$(SSH_HOST):$(REMOTE_PROJECT_PATH)"
-	scp -r crt_tv "$(SSH_HOST):$(REMOTE_PROJECT_PATH)"
-	scp -r assets "$(SSH_HOST):$(REMOTE_PROJECT_PATH)"
-	scp "$(SYSTEMD_SERVICE_NAME)" "$(SSH_HOST):$(REMOTE_SYSTEMD_SEVERICE_PATH)"
-	ssh "$(SSH_HOST)" "chown root:root $(REMOTE_SYSTEMD_SEVERICE_PATH)"
-	ssh "$(SSH_HOST)" "chmod 644 $(REMOTE_SYSTEMD_SEVERICE_PATH)"
-	ssh "$(SSH_HOST)" "systemctl daemon-reload"
-	ssh "$(SSH_HOST)" "systemctl enable $(SYSTEMD_SERVICE_NAME)"
-	ssh "$(SSH_HOST)" "systemctl start $(SYSTEMD_SERVICE_NAME)"
+	ssh "$(SSH_HOST)" "rm -rf /tmp/crt-tv"
+	ssh "$(SSH_HOST)" "git clone https://github.com/arturbalabanov/crt-tv/ /tmp/crt-tv"
+	ssh "$(SSH_HOST)" "/tmp/crt-tv/install.sh"
+	ssh "$(SSH_HOST)" "rm -rf /tmp/crt-tv"
 
 .PHONY: service-logs
 service-logs:  ## Show the logs of the systemd service
@@ -41,7 +31,7 @@ service-status:  ## Show the logs of the systemd service
 
 .PHONY: install
 install:  ## Install the CLI tool locally
-	uv tool install . --editable --force
+	uv tool install . --editable --force 
 
 
 .PHONY: lint
