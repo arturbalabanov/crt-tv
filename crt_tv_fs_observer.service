@@ -1,0 +1,15 @@
+[Unit]
+Description=CRT TV Filesystem Ovserver (automatically process new images)
+After=default.target
+[Service]
+# Our service will notify systemd once it is up and running
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/root/.local/bin/crt-tv --verbose run-observer
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=multi-user.target
