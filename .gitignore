@@ -174,4 +174,4 @@ bandit.json
 .DS_Store
 
 # Local Testing
-output/
+local/
