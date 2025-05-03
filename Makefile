@@ -16,10 +16,9 @@ clean:  ## Remove the build artifacts
 	
 .PHONY: deploy
 deploy:  clean ## Deploy the project to the remote host
-	ssh "$(SSH_HOST)" "rm -rf /tmp/crt-tv"
-	ssh "$(SSH_HOST)" "git clone https://github.com/arturbalabanov/crt-tv/ /tmp/crt-tv"
-	ssh "$(SSH_HOST)" "cd /tmp/crt-tv && ./install.sh"
-	ssh "$(SSH_HOST)" "rm -rf /tmp/crt-tv"
+	ssh "$(SSH_HOST)" "rm -rf /opt/crt-tv"
+	ssh "$(SSH_HOST)" "git clone https://github.com/arturbalabanov/crt-tv/ /opt/crt-tv"
+	ssh "$(SSH_HOST)" "cd /opt/crt-tv && ./install.sh"
 
 .PHONY: service-logs
 service-logs:  ## Show the logs of the systemd service
@@ -31,7 +30,7 @@ service-status:  ## Show the logs of the systemd service
 
 .PHONY: install
 install:  ## Install the CLI tool locally
-	uv tool install . --editable --force 
+	uv tool install . --editable --reinstall 
 
 
 .PHONY: lint
