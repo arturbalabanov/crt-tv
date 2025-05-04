@@ -21,7 +21,7 @@ from crt_tv.utils import get_output_image_path
 # TODO: Add a handler for video files (not processing them for now, simply copying them)
 
 
-class SourceFileEventHanlder(PatternMatchingEventHandler):
+class ImageFileHandler(PatternMatchingEventHandler):
     def __init__(self, config: Config) -> None:
         super().__init__(
             patterns=["*.jpg"],
@@ -36,7 +36,9 @@ class SourceFileEventHanlder(PatternMatchingEventHandler):
             return
 
         try:
-            dest_path = process_single_image(file_path, self.config, get_timestamp_font(self.config))
+            dest_path = process_single_image(
+                file_path, self.config, get_timestamp_font(self.config)
+            )
         except Exception:
             logger.exception(f"Error processing file {file_path}")
         else:
@@ -56,39 +58,51 @@ class SourceFileEventHanlder(PatternMatchingEventHandler):
         else:
             logger.debug(f"Successfully deleted file {processed_file_path}")
 
-    def on_created(self, event: FileCreatedEvent) -> None:
-        file_path = pathlib.Path(event.src_path)
+    def on_created(self, event: FileCreatedEvent) -> None:  # type: ignore[override]
+        file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
+
         logger.debug(f"Detected file created: {file_path}")
 
         self._try_process_file(file_path)
 
-    def on_modified(self, event: FileModifiedEvent) -> None:
-        # TODO: Check that the file was actually different (otherwise simply opening them remotely triggers this)
-        file_path = pathlib.Path(event.src_path)
-        logger.debug(f"Detected file modified: {file_path}")
-        self._try_process_file(file_path)
+    def on_modified(self, event: FileModifiedEvent) -> None:  # type: ignore[override]
+        file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
 
-    def on_moved(self, event: FileMovedEvent) -> None:
-        # TODO: If moved outside of the source directory, delete the processed file
+        # Simply opening the file file in Finder causes a modification event, so we just ignore it,
+        # on_created, on_deleted and on_moved should be enough
+        logger.debug(f"Detected file modified: {file_path}, ignoring")
 
-        old_file_path = pathlib.Path(event.src_path)
-        new_file_path = pathlib.Path(event.dest_path)
+    def on_moved(self, event: FileMovedEvent) -> None:  # type: ignore[override]
+        old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
+        new_file_path = pathlib.Path(event.dest_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file moved: {old_file_path} -> {new_file_path}")
+
+        # check if moved outside of self.config.source_files_dir
+        if not new_file_path.is_relative_to(self.config.source_files_dir):
+            logger.debug(f"File moved outside of source directory: {new_file_path}")
+            self._try_delete_processed_file(old_file_path)
+            return
 
         old_processed_file_path = get_output_image_path(old_file_path, self.config)
         new_processed_file_path = get_output_image_path(new_file_path, self.config)
 
         try:
-            logger.debug(f"Moving processed file {old_processed_file_path} -> {new_processed_file_path}")
+            logger.debug(
+                f"Moving processed file {old_processed_file_path} -> {new_processed_file_path}"
+            )
             shutil.move(old_processed_file_path, new_processed_file_path)
         except Exception:
-            logger.exception(f"Error moving file {old_processed_file_path} -> {new_processed_file_path}")
+            logger.exception(
+                f"Error moving file {old_processed_file_path} -> {new_processed_file_path}"
+            )
         else:
-            logger.debug(f"Successfully moved file {old_processed_file_path} -> {new_processed_file_path}")
+            logger.debug(
+                f"Successfully moved file {old_processed_file_path} -> {new_processed_file_path}"
+            )
 
-    def on_deleted(self, event: FileDeletedEvent) -> None:
-        old_file_path = pathlib.Path(event.src_path)
+    def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
+        old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file deleted: {old_file_path}")
         self._try_delete_processed_file(old_file_path)
 
@@ -99,12 +113,16 @@ def observe_and_action_fs_events(
     recursive: bool = True,
     sleep_time: float = 0.1,
 ) -> None:
-    logger.info(f"Starting to observe file system events for source files in {config.source_files_dir}")
+    logger.info(
+        f"Starting to observe file system events for source files in {config.source_files_dir}"
+    )
 
-    event_handler = SourceFileEventHanlder(config)
+    images_handler = ImageFileHandler(config)
     observer = Observer()
 
-    observer.schedule(event_handler, str(config.source_files_dir.resolve()), recursive=recursive)
+    observer.schedule(
+        images_handler, str(config.source_files_dir.resolve()), recursive=recursive
+    )
     observer.start()
 
     try:
