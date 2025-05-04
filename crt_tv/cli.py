@@ -125,4 +125,4 @@ def run_observer(
 
     logger.info(f"Running file system observer for {config.source_files_dir}")
 
-    observe_and_action_fs_events(config, recursive=True)
+    observe_and_action_fs_events(config, recursive=recursive, sleep_time=sleep_time)

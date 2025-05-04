@@ -17,14 +17,8 @@ from crt_tv.images import process_single_image
 from crt_tv.timestamp import get_timestamp_font
 from crt_tv.utils import get_output_image_path
 
-# TODO: Add a handler for the config file and:
-#       * on_modified: reload it
-#       * on_delete: log a critical error and abort
-#       * on_moved: log a warning
-
-
-# TODO: Add exception handling for the handler/observer -- it's running in a seperate thread
-#       which is why it's not automatic
+# FIXME: Created files are not used to the correct dest path (missing PHOTO/)
+# TODO: Add a handler for video files (not processing them for now, simply copying them)
 
 
 class SourceFileEventHanlder(PatternMatchingEventHandler):
