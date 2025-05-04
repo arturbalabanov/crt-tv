@@ -175,3 +175,6 @@ bandit.json
 
 # Local Testing
 local/
+
+# Ansible
+.ansible/

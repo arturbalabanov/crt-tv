@@ -1,0 +1,58 @@
+---
+- name: Deploy the latest version of the scripts to the CRT-connected raspberry pi
+  hosts: crt
+  tasks:
+    - name: Ping the hosts
+      ansible.builtin.ping:
+
+    - name: Check if uv is installed
+      ansible.builtin.command: uv --version
+      register: uv_installed
+      check_mode: false
+      changed_when: false
+      failed_when: uv_installed.rc != 0 and uv_installed.rc != 127
+
+    - name: Donwload uv
+      ansible.builtin.get_url:
+        url: https://astral.sh/uv/install.sh
+        dest: /tmp/install-uv.sh
+        mode: "0755"
+      when: "'command not found' in uv_installed.stdout"
+
+    - name: Install uv
+      ansible.builtin.command:
+        cmd: ./install-uv.sh
+        chdir: /tmp
+      when: "'command not found' in uv_installed.stdout"
+
+    - name: Install requirements for text recognision in images
+      ansible.builtin.apt:
+        state: present
+        name:
+          - tesseract-ocr
+          - tesseract-ocr-eng
+
+    - name: Fetch the latest version of the repo from GitHub
+      ansible.builtin.git:
+        repo: 'https://github.com/arturbalabanov/crt-tv'
+        dest: /opt/crt-tv
+
+    - name: Install the CLI tool
+      ansible.builtin.command:
+        cmd: uv tool install . --editable --reinstall
+        chdir: /opt/crt-tv
+
+    - name: Deploy crt_tv_fs_observer.service systemd service
+      ansible.builtin.template:
+        src: templates/crt_tv_fs_observer.service.jinja2
+        dest: /etc/systemd/system/crt_tv_fs_observer.service
+        group: root
+        owner: root
+        mode: 0644
+
+    - name: Enable and restart crt_tv_fs_observer.service
+      ansible.builtin.systemd_service:
+        state: restarted
+        enabled: true
+        daemon_reload: true
+        name: crt_tv_fs_observer.service

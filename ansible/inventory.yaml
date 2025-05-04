@@ -1,0 +1,5 @@
+---
+crt:
+  hosts:
+    crt:
+      ansible_host: crt
