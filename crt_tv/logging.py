@@ -15,5 +15,5 @@ def configure_logging(stdout_level: str = "INFO") -> None:
         sys.stdout,
         colorize=True,
         level=stdout_level,
-        format="<level>{level}</level> {message}",
+        format="[{thread.name}] {time:YYYY-MM-DD HH:mm:ss} <level>{level}</level> {message}",
     )
