@@ -2,9 +2,11 @@ import datetime
 import pathlib
 import re
 
+import moviepy.editor as mp
 import pytesseract
 from loguru import logger
 from PIL.Image import Image
+from PIL.Image import fromarray as image_fromarray
 from PIL.ImageDraw import Draw
 from PIL.ImageFont import FreeTypeFont, truetype
 
@@ -45,7 +47,9 @@ def parse_timestamp_from_image(
 
     logger.debug("Extracting all text from from the cut part of the image")
 
-    extracted_text = pytesseract.image_to_string(timestamp_region, timeout=config.timestamp.detect_timeout_seconds)
+    extracted_text = pytesseract.image_to_string(
+        timestamp_region, timeout=config.timestamp.detect_timeout_seconds
+    )
 
     logger.debug(f"Extracted text: '{extracted_text}'")
 
@@ -55,9 +59,13 @@ def parse_timestamp_from_image(
 
     if failed_timestamp_extracts_dir and (not match or match.group("time") is None):
         timestamp_path = failed_timestamp_extracts_dir / img_file_path.name
-        relative_timestamp_path = timestamp_path.relative_to(failed_timestamp_extracts_dir.parent)
+        relative_timestamp_path = timestamp_path.relative_to(
+            failed_timestamp_extracts_dir.parent
+        )
 
-        logger.info(f"Couldn't extract the timestamp, saving the cut part of the image to {relative_timestamp_path}")
+        logger.info(
+            f"Couldn't extract the timestamp, saving the cut part of the image to {relative_timestamp_path}"
+        )
 
         failed_timestamp_extracts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -89,6 +97,42 @@ def parse_timestamp_from_image(
     return datetime.datetime(year, month, day, hour, minute, second)
 
 
+def parse_timestamp_from_video(
+    video: mp.VideoFileClip,
+    config: Config,
+    video_file_path: pathlib.Path,
+) -> datetime.datetime | datetime.date:
+    # TODO: Add logging
+    orig_width, orig_height = video.size
+    total_frames = video.reader.nframes
+
+    total_attempts = config.timestamp.video_max_attempts
+    best_timestamp: datetime.datetime | datetime.date | None = None
+
+    for attempt in range(total_attempts):
+        frame_number = int((total_frames // total_attempts) * attempt)
+        img = image_fromarray(video.get_frame(frame_number))
+
+        try:
+            timestamp = parse_timestamp_from_image(img, config, video_file_path)
+        except Exception:
+            continue
+
+        if isinstance(timestamp, datetime.datetime):
+            best_timestamp = timestamp
+            break
+
+        if isinstance(timestamp, datetime.date) and best_timestamp is not None:
+            best_timestamp = timestamp
+
+    if best_timestamp is None:
+        raise ValueError(
+            f"No timestamp found in the video after {total_attempts} attempts"
+        )
+
+    return best_timestamp
+
+
 def draw_timestamp(
     img: Image,
     timestamp: datetime.datetime | datetime.date,
@@ -104,7 +148,9 @@ def draw_timestamp(
         logger.warning("Only date found in the image, using it as timestamp")
         timestamp_text = timestamp.strftime(config.timestamp.date_format)
     else:
-        raise TypeError(f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}")
+        raise TypeError(
+            f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
+        )
 
     draw = Draw(img)
     text_bbox_left, text_bbox_top, text_bbox_right, text_bbox_bottom = draw.textbbox(
@@ -149,8 +195,18 @@ def draw_timestamp(
 
     bg_rect_left = timestamp_x + config.timestamp.margin_left
     bg_rect_top = timestamp_y + config.timestamp.margin_top
-    bg_rect_right = bg_rect_left + config.timestamp.padding_left + text_width + config.timestamp.padding_right
-    bg_rect_bottom = bg_rect_top + config.timestamp.padding_top + text_height + config.timestamp.padding_bottom
+    bg_rect_right = (
+        bg_rect_left
+        + config.timestamp.padding_left
+        + text_width
+        + config.timestamp.padding_right
+    )
+    bg_rect_bottom = (
+        bg_rect_top
+        + config.timestamp.padding_top
+        + text_height
+        + config.timestamp.padding_bottom
+    )
 
     text_x = bg_rect_left + config.timestamp.padding_left
     text_y = bg_rect_top - text_bbox_top + config.timestamp.padding_top

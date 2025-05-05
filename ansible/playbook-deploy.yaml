@@ -5,6 +5,16 @@
     - name: Ping the hosts
       ansible.builtin.ping:
 
+    - name: Install system packages requirements
+      ansible.builtin.apt:
+        state: present
+        name:
+          - tesseract-ocr
+          - tesseract-ocr-eng
+          - imagemagick
+          - ffmpeg
+          - git
+
     - name: Check if uv is installed
       ansible.builtin.command: uv --version
       register: uv_installed
@@ -24,13 +34,6 @@
         cmd: ./install-uv.sh
         chdir: /tmp
       when: "'command not found' in uv_installed.stdout"
-
-    - name: Install requirements for text recognision in images
-      ansible.builtin.apt:
-        state: present
-        name:
-          - tesseract-ocr
-          - tesseract-ocr-eng
 
     - name: Fetch the latest version of the repo from GitHub
       ansible.builtin.git:

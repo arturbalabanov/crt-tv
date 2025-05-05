@@ -1,15 +1,23 @@
+import datetime
 import pathlib
 from typing import Annotated, TypedDict
 
+import moviepy.editor as mp
+import moviepy.video.fx.all as vfx
 import typer
 from loguru import logger
 from PIL.Image import open as image_open
 
 from crt_tv.config import Config
 from crt_tv.fs_observer import observe_and_action_fs_events
-from crt_tv.images import process_single_image
+from crt_tv.images import get_new_dimensions, process_single_image
 from crt_tv.logging import configure_logging
-from crt_tv.timestamp import get_timestamp_font, parse_timestamp_from_image
+from crt_tv.timestamp import (
+    get_timestamp_font,
+    parse_timestamp_from_image,
+    parse_timestamp_from_video,
+)
+from crt_tv.utils import get_output_image_path
 
 
 class CLIState(TypedDict):
@@ -17,7 +25,10 @@ class CLIState(TypedDict):
     config: Config
 
 
-app = typer.Typer(name="crt-tv", help="A collection of scripts I'm running on a Raspberry Pi connected to a CRT TV")
+app = typer.Typer(
+    name="crt-tv",
+    help="A collection of scripts I'm running on a Raspberry Pi connected to a CRT TV",
+)
 
 
 cli_state: CLIState = {
@@ -53,13 +64,17 @@ def main(
     configure_logging(stdout_level="DEBUG" if verbose else "INFO")
 
     if not config_file.is_absolute():
-        raise typer.BadParameter(f"--config-file: {config_file} is not an absolute path")
+        raise typer.BadParameter(
+            f"--config-file: {config_file} is not an absolute path"
+        )
 
     if not config_file.is_file():
         raise typer.BadParameter(f"--config-file: {config_file} is not a file")
 
     if config_file.suffix != ".toml":
-        raise typer.BadParameter(f"--config-file: {config_file} is not a TOML file, must be .toml")
+        raise typer.BadParameter(
+            f"--config-file: {config_file} is not a TOML file, must be .toml"
+        )
 
     logger.info(f"Loading configuration from {config_file}")
     cli_state["config"] = Config.load_from_file(config_file)
@@ -108,7 +123,9 @@ def get_timestamp(file: pathlib.Path) -> None:
             logger.warning(f"No timestamp found in {file.name}")
             image_timestamp = None
         except RuntimeError as exc:
-            logger.warning(f"Tesseract timed out while processing {file.name}", exc_info=True)
+            logger.warning(
+                f"Tesseract timed out while processing {file.name}", exc_info=True
+            )
             raise typer.Exit(code=1) from exc
 
     logger.info(f"Timestamp found: {image_timestamp}")
@@ -116,8 +133,13 @@ def get_timestamp(file: pathlib.Path) -> None:
 
 @app.command()
 def run_observer(
-    recursive: Annotated[bool, typer.Option(help="Should the observer check for files in nested directories")] = True,
-    sleep_time: Annotated[float, typer.Option(help="How often (in seconds) to check for fs events")] = 0.1,
+    recursive: Annotated[
+        bool,
+        typer.Option(help="Should the observer check for files in nested directories"),
+    ] = True,
+    sleep_time: Annotated[
+        float, typer.Option(help="How often (in seconds) to check for fs events")
+    ] = 0.1,
 ) -> None:
     """Run the file system observer to automatically process images from the source directory"""
 
@@ -126,3 +148,79 @@ def run_observer(
     logger.info(f"Running file system observer for {config.source_files_dir}")
 
     observe_and_action_fs_events(config, recursive=recursive, sleep_time=sleep_time)
+
+
+@app.command()
+def process_video(file: pathlib.Path) -> None:
+    config = cli_state["config"]
+
+    video = mp.VideoFileClip(str(file.resolve()))
+    timestamp_clip = None
+
+    try:
+        timestamp = parse_timestamp_from_video(video, config, file)
+    except Exception:
+        logger.warning(
+            f"Couldn't extract the timestamp from {file.name}, skipping adding it to the video",
+            exc_info=True,
+        )
+    else:
+        if isinstance(timestamp, datetime.datetime):
+            timestamp_text = timestamp.strftime(config.timestamp.full_format)
+        elif isinstance(timestamp, datetime.date):
+            logger.warning("Only date found in the video, using it as timestamp")
+            timestamp_text = timestamp.strftime(config.timestamp.date_format)
+        else:
+            raise TypeError(
+                f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
+            )
+
+        timestamp_clip = mp.TextClip(
+            font=config.timestamp.font_names[0],
+            txt=timestamp_text,
+            fontsize=config.timestamp.video_font_size,
+            color=config.timestamp.fg_color,
+            bg_color=config.timestamp.bg_color,
+        )
+
+    orig_width, orig_height = video.size
+    new_width, new_height = get_new_dimensions(
+        orig_width=orig_width,
+        orig_height=orig_height,
+        new_aspect_ratio=config.aspect_ratio,
+        resize_method=config.resize_method,
+    )
+
+    crop_x = (orig_width - new_width) // 2 if orig_width != new_width else 0
+    crop_y = (orig_height - new_height) // 2 if orig_height != new_height else 0
+
+    resized_video = vfx.crop(
+        video,
+        x1=crop_x,
+        y1=crop_y,
+        width=new_width,
+        height=new_height,
+    )
+
+    if timestamp_clip is not None:
+        y_pos, x_pos = config.timestamp.position.split(" ")
+
+        resized_video = mp.CompositeVideoClip(
+            [
+                resized_video,
+                timestamp_clip.set_duration(video.duration).set_pos(
+                    (0, new_height - 80)
+                ),
+            ]
+        )
+    dest_path = get_output_image_path(file, config).resolve().with_suffix(".mp4")
+
+    resized_video.write_videofile(
+        str(dest_path),
+        codec="libx264",
+        audio_codec="aac",
+    )
+
+    logger.info(
+        f"Processed video {file.name} to {dest_path.resolve()} with size {new_width}x{new_height}"
+    )

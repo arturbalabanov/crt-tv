@@ -44,28 +44,40 @@ class TimestampConfig(BaseModel):
     padding_bottom: int = 30
     font_names: list[str | pathlib.Path] = Field(
         default_factory=lambda: DEFAULT_FONTS,
-        description=textwrap.dedent("""
+        description=textwrap.dedent(
+            """
              List of fonts to use for the timestamp (the first match will be used)
              ref: https://pillow.readthedocs.io/en/stable/reference/ImageFont.html#PIL.ImageFont.truetype
-        """).strip(),
+        """
+        ).strip(),
     )
     font_size: int = 80
+    video_font_size: int = 48
     detect_timeout_seconds: int = 30
+    video_max_attempts: int = 10
 
     @field_validator("failed_timestamp_extracts_dir")
     @classmethod
-    def validate_failed_timestamp_extracts_dir(cls, value: pathlib.Path | None) -> pathlib.Path | None:
+    def validate_failed_timestamp_extracts_dir(
+        cls, value: pathlib.Path | None
+    ) -> pathlib.Path | None:
         if value is None:
             return None
 
         if not value.is_absolute():
-            raise ValueError(f"failed_timestamp_extracts_dir: Path must be absolute: {value}")
+            raise ValueError(
+                f"failed_timestamp_extracts_dir: Path must be absolute: {value}"
+            )
 
         if not value.exists():
-            logger.info(f"failed_timestamp_extracts_dir: Directory does not exist, creating: {value}")
+            logger.info(
+                f"failed_timestamp_extracts_dir: Directory does not exist, creating: {value}"
+            )
             value.mkdir(parents=True, exist_ok=True)
         elif not value.is_dir():
-            raise ValueError(f"failed_timestamp_extracts_dir: Path is not a directory: {value}")
+            raise ValueError(
+                f"failed_timestamp_extracts_dir: Path is not a directory: {value}"
+            )
 
         return value
 
@@ -98,7 +110,9 @@ class Config(BaseModel):
             raise ValueError(f"output_files_dir: Path must be absolute: {value}")
 
         if not value.exists():
-            logger.info(f"output_files_dir: Directory does not exist, creating: {value}")
+            logger.info(
+                f"output_files_dir: Directory does not exist, creating: {value}"
+            )
             value.mkdir(parents=True, exist_ok=True)
         elif not value.is_dir():
             raise ValueError(f"output_files_dir: Path is not a directory: {value}")
@@ -112,7 +126,9 @@ class Config(BaseModel):
     @classmethod
     def validate_aspect_ratio(cls, value: str) -> str:
         if not ASPECT_RATIO_REGEX.match(value):
-            raise ValueError(f"Invalid aspect ratio '{value}', must be in the form 'width:height' (e.g. '4:3')")
+            raise ValueError(
+                f"Invalid aspect ratio '{value}', must be in the form 'width:height' (e.g. '4:3')"
+            )
 
         return value
 
