@@ -80,31 +80,72 @@ def main(
 
 
 @app.command()
-def process_images() -> None:
-    """Resize images in the source directory to the specified aspect ratio and optionally add a timestamp"""
+def process(
+    file_path: Annotated[
+        pathlib.Path | None,
+        typer.Argument(
+            help="A file or directory to process, if not set all files in the source directory will be processed"
+        ),
+    ] = None,
+) -> None:
+    """Resize images and videos in the source directory to the specified aspect ratio and optionally add a timestamp"""
 
     config = cli_state["config"]
+    timestamp_font = get_timestamp_font(config)
+
+    if file_path is None:
+        source_files_dir = config.source_files_dir
+    elif file_path.is_dir():
+        source_files_dir = file_path
+    elif file_path.is_file():
+        if file_path.suffix.lower() == ".jpg":
+            process_single_image(file_path, config, timestamp_font)
+        elif file_path.suffix.lower() == ".avi":
+            process_single_video(file_path, config)
+        else:
+            logger.error(
+                f"File {file_path.name} is not a supported format, suffix must be .jpg or .avi"
+            )
+            raise typer.Exit(code=1)
+
+        return
+    else:
+        logger.error(f"File {file_path} is not a file or directory")
+        raise typer.Exit(code=1)
 
     logger.info(
-        f"Resizing images in {config.source_files_dir} to {config.aspect_ratio} aspect ratio "
+        f"Resizing files in {config.source_files_dir} to {config.aspect_ratio} aspect ratio "
         f"using {config.resize_method} method"
     )
 
-    timestamp_font = get_timestamp_font(config)
-
     processed_images_count = 0
+    processed_videos_count = 0
 
-    for image_path in config.source_files_dir.glob("**/*.[jJ][pP][gG]"):
-        relative_image_path = image_path.relative_to(config.source_files_dir)
+    for file_path in source_files_dir.glob("**/*"):
+        if file_path.is_dir():
+            continue
 
-        output_image_path = config.output_files_dir / relative_image_path
-        output_image_path.parent.mkdir(parents=True, exist_ok=True)
+        if file_path.name.startswith("."):
+            continue
 
-        process_single_image(image_path, config, timestamp_font)
+        relative_file_path = file_path.relative_to(config.source_files_dir)
+        output_file_path = config.output_files_dir / relative_file_path
+        output_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        processed_images_count += 1
+        if file_path.suffix.lower() == ".jpg":
+            process_single_image(file_path, config, timestamp_font)
+            processed_images_count += 1
+        elif file_path.suffix.lower() == ".avi":
+            process_single_video(file_path, config)
+            processed_videos_count += 1
+        else:
+            logger.warning(
+                f"File {file_path.name} is not a supported format, suffix must be .jpg or .avi, skipping"
+            )
 
-    logger.info(f"Processed {processed_images_count} images")
+    logger.info(
+        f"Processed {processed_images_count} images and {processed_videos_count} videos"
+    )
 
 
 @app.command()
@@ -164,10 +205,3 @@ def run_observer(
     logger.info(f"Running file system observer for {config.source_files_dir}")
 
     observe_and_action_fs_events(config, recursive=recursive, sleep_time=sleep_time)
-
-
-@app.command()
-def process_video(file: pathlib.Path) -> None:
-    config = cli_state["config"]
-
-    process_single_video(file, config)
