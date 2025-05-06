@@ -4,6 +4,7 @@ import textwrap
 import tomllib
 from typing import Literal, Self
 
+import PIL.ImageColor
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 
@@ -19,6 +20,13 @@ DEFAULT_FONTS: list[str | pathlib.Path] = [
     "FreeMonoBold.ttf",
 ]
 
+# TODO: Clean up this mess:
+#       seperate photo vs video vs common settings
+#       remove the font, always use your own
+#       font is different for photos vs videos
+
+# TODO: Colors: allow basic names or #RRGGBB form
+
 
 class TimestampConfig(BaseModel):
     position: Literal["top left", "top right", "bottom left", "bottom right"] = Field(
@@ -32,8 +40,18 @@ class TimestampConfig(BaseModel):
     )
     date_format: str = "%-d %b %Y"  # e.g. 6 Nov 2024
     full_format: str = "%-d %b %Y %H:%M:%S"  # e.g. 6 Nov 2024 19:49:02
-    fg_color: str | tuple[int, int, int] = "white"
-    bg_color: str | tuple[int, int, int] = "black"
+    fg_color: str = Field(
+        default="white",
+        description=(
+            "Foreground color of the timestamp to be appended, can be a color name or a hex value, e.g. #FFFFFF"
+        ),
+    )
+    bg_color: str = Field(
+        default="black",
+        description=(
+            "Background color of the timestamp to be appended, can be a color name or a hex value, e.g. #FFFFFF"
+        ),
+    )
     margin_left: int = 0
     margin_right: int = 0
     margin_top: int = 0
@@ -81,10 +99,34 @@ class TimestampConfig(BaseModel):
 
         return value
 
+    @property
+    def fg_color_rgb(self) -> tuple[int, int, int] | tuple[int, int, int, int]:
+        return PIL.ImageColor.getrgb(self.fg_color)
+
+    @property
+    def bg_color_rgb(self) -> tuple[int, int, int] | tuple[int, int, int, int]:
+        return PIL.ImageColor.getrgb(self.bg_color)
+
+
+class TimestampVideosConfig(BaseModel):
+    position: Literal["top left", "top right", "bottom left", "bottom right"] = Field(
+        default="bottom left",
+        description="Position of the timestamp to be appended to the video",
+    )
+    margin_left: int = 0
+    margin_right: int = 0
+    margin_top: int = 0
+    margin_bottom: int = 30
+    padding_left: int = 80
+    padding_right: int = 15
+    padding_top: int = 15
+    padding_bottom: int = 15
+
 
 class VideosConfig(BaseModel):
     video_codec: str = "libx264"
     audio_codec: str = "aac"
+    timestamp: TimestampVideosConfig = Field(default_factory=TimestampVideosConfig)
 
 
 class Config(BaseModel):

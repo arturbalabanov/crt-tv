@@ -16,7 +16,7 @@ def process_single_video(
     config: Config,
 ) -> pathlib.Path:
     with mp.VideoFileClip(str(video_path.resolve())) as video:
-        timestamp_clip = None
+        timestamp_text_clip = None
 
         try:
             timestamp = parse_timestamp_from_video(video, config, video_path)
@@ -35,12 +35,11 @@ def process_single_video(
                     f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
                 )
 
-            timestamp_clip = mp.TextClip(
+            timestamp_text_clip = mp.TextClip(
                 font=config.timestamp.font_names[0],
                 txt=timestamp_text,
                 fontsize=config.timestamp.video_font_size,
                 color=config.timestamp.fg_color,
-                bg_color=config.timestamp.bg_color,
             )
 
         orig_width, orig_height = video.size
@@ -62,16 +61,61 @@ def process_single_video(
             height=new_height,
         )
 
-        if timestamp_clip is not None:
-            y_pos, x_pos = config.timestamp.position.split(" ")
+        if timestamp_text_clip is not None:
+            timestamp_text_width, timestamp_text_height = timestamp_text_clip.size
+            bg_rect_width = (
+                config.videos.timestamp.padding_left
+                + timestamp_text_width
+                + config.videos.timestamp.padding_right
+            )
+            bg_rect_height = (
+                config.videos.timestamp.padding_top
+                + timestamp_text_height
+                + config.videos.timestamp.padding_bottom
+            )
+
+            bg_rect_clip = mp.ColorClip(
+                color=config.timestamp.bg_color_rgb,
+                size=(bg_rect_width, bg_rect_height),
+            )
+
+            match config.videos.timestamp.position:
+                case "top left":
+                    timestamp_x = 0
+                    timestamp_y = 0
+                case "top right":
+                    timestamp_x = new_width - bg_rect_width
+                    timestamp_y = 0
+                case "bottom left":
+                    timestamp_x = 0
+                    timestamp_y = new_height - bg_rect_height
+                case "bottom right":
+                    timestamp_x = new_width - bg_rect_width
+                    timestamp_y = new_height - bg_rect_height
+                case _:
+                    raise RuntimeError("invalid branch")
+
+            bg_rect_x = (
+                timestamp_x
+                + config.videos.timestamp.margin_left
+                - config.videos.timestamp.margin_right
+            )
+            bg_rect_y = (
+                timestamp_y
+                + config.videos.timestamp.margin_top
+                - config.videos.timestamp.margin_bottom
+            )
+            timestamp_text_x = bg_rect_x + config.videos.timestamp.padding_left
+            timestamp_text_y = bg_rect_y + config.videos.timestamp.padding_top
 
             resized_video = mp.CompositeVideoClip(
                 [
                     resized_video,
-                    timestamp_clip.set_duration(video.duration).set_pos(
-                        # TODO: Extract these numbers into config options
-                        # TODO: Take into account the timestamp position
-                        (0, new_height - 80)
+                    bg_rect_clip.set_duration(video.duration).set_pos(
+                        (bg_rect_x, bg_rect_y)
+                    ),
+                    timestamp_text_clip.set_duration(video.duration).set_pos(
+                        (timestamp_text_x, timestamp_text_y)
                     ),
                 ]
             )
