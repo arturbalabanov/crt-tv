@@ -18,13 +18,15 @@ def process_single_image(
 
     with image_open(image_path) as img:
         try:
-            image_timestamp = parse_timestamp_from_image(img, config, image_path)
+            image_timestamp = parse_timestamp_from_image(
+                img, config, failed_timestamp_filename=image_path.name
+            )
         except ValueError:
             logger.warning(f"No timestamp found in {image_path.name}")
             image_timestamp = None
         except RuntimeError:
-            logger.warning(
-                f"Tesseract timed out while processing {image_path.name}", exc_info=True
+            logger.opt(exception=True).warning(
+                f"Tesseract timed out while processing {image_path.name}"
             )
             image_timestamp = None
 

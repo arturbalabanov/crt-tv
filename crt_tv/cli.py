@@ -118,13 +118,15 @@ def get_timestamp(file: pathlib.Path) -> None:
 
     with image_open(file) as img:
         try:
-            image_timestamp = parse_timestamp_from_image(img, config, file)
+            image_timestamp = parse_timestamp_from_image(
+                img, config, failed_timestamp_filename=file.name
+            )
         except ValueError:
             logger.warning(f"No timestamp found in {file.name}")
             image_timestamp = None
         except RuntimeError as exc:
-            logger.warning(
-                f"Tesseract timed out while processing {file.name}", exc_info=True
+            logger.opt(exception=True).warning(
+                f"Tesseract timed out while processing {file.name}"
             )
             raise typer.Exit(code=1) from exc
 
@@ -160,9 +162,8 @@ def process_video(file: pathlib.Path) -> None:
     try:
         timestamp = parse_timestamp_from_video(video, config, file)
     except Exception:
-        logger.warning(
+        logger.opt(exception=True).warning(
             f"Couldn't extract the timestamp from {file.name}, skipping adding it to the video",
-            exc_info=True,
         )
     else:
         if isinstance(timestamp, datetime.datetime):

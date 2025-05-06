@@ -38,11 +38,13 @@ TIMESTAMP_PARSE_REGEX = re.compile(
 def parse_timestamp_from_image(
     img: Image,
     config: Config,
-    img_file_path: pathlib.Path,
+    *,
+    failed_timestamp_filename: str,
 ) -> datetime.datetime | datetime.date:
     logger.debug("Cutting the bottom left corner of the image to extract the timestamp")
 
     img_width, img_height = img.size
+    # TODO: Extract the magic numbers these into config options
     timestamp_region = img.crop((0, img_height - 100, 1000, img_height))
 
     logger.debug("Extracting all text from from the cut part of the image")
@@ -58,7 +60,7 @@ def parse_timestamp_from_image(
     failed_timestamp_extracts_dir = config.timestamp.failed_timestamp_extracts_dir
 
     if failed_timestamp_extracts_dir and (not match or match.group("time") is None):
-        timestamp_path = failed_timestamp_extracts_dir / img_file_path.name
+        timestamp_path = failed_timestamp_extracts_dir / failed_timestamp_filename
         relative_timestamp_path = timestamp_path.relative_to(
             failed_timestamp_extracts_dir.parent
         )
@@ -116,20 +118,28 @@ def parse_timestamp_from_video(
 
     best_timestamp: datetime.datetime | datetime.date | None = None
 
-    for attempt in range(1, total_attempts + 1):
-        frame_number = int((total_frames // total_attempts) * attempt)
+    for attempt in range(0, total_attempts):
+        frame_number = min(
+            int((total_frames // total_attempts) * attempt), total_frames
+        )
+        frame_time = min(frame_number / video.fps, video.duration)
+
         logger.debug(
-            f"Attempt {attempt}/{total_attempts}: Extracting frame {frame_number}"
+            f"Attempt {attempt + 1}/{total_attempts}: Extracting frame {frame_number} at time {frame_time:.2f}s"
         )
 
-        img = image_fromarray(video.get_frame(frame_number))
+        img = image_fromarray(video.get_frame(frame_time))
 
         try:
-            timestamp = parse_timestamp_from_image(img, config, video_file_path)
+            timestamp = parse_timestamp_from_image(
+                img,
+                config,
+                failed_timestamp_filename=f"{video_file_path.stem}_frame_{frame_number}.jpg",
+            )
             logger.debug(f"Timestamp successfully extracted: {timestamp}")
         except Exception:
-            logger.warning(
-                f"Failed to extract timestamp from frame {frame_number}", exc_info=True
+            logger.opt(exception=True).warning(
+                f"Failed to extract timestamp from frame {frame_number}"
             )
             continue
 
