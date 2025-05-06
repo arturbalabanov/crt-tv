@@ -3,6 +3,7 @@ import pathlib
 from typing import Annotated, TypedDict
 
 import moviepy.editor as mp
+import rich
 import typer
 from loguru import logger
 from PIL.Image import open as image_open
@@ -209,6 +210,24 @@ def run_observer(
 
 @app.command()
 def healthcheck():
-    from moviepy.config import check
+    from moviepy.config import FFMPEG_BINARY, IMAGEMAGICK_BINARY, try_cmd
 
-    check()
+    success = True
+
+    rich.print(f"[MoviePy] checking ffmpeg binary at {FFMPEG_BINARY}... ", end="")
+    if try_cmd([FFMPEG_BINARY])[0]:
+        rich.print("✅")
+    else:
+        rich.print("❌ (not found)")
+        success = False
+
+    rich.print(
+        f"[MoviePy] checking ImageMagick binary at {IMAGEMAGICK_BINARY}... ", end=""
+    )
+    if try_cmd([IMAGEMAGICK_BINARY])[0]:
+        rich.print("✅")
+    else:
+        rich.print("❌ (not found)")
+        success = False
+
+    raise typer.Exit(code=0 if success else 1)
