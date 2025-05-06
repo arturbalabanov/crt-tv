@@ -102,34 +102,54 @@ def parse_timestamp_from_video(
     config: Config,
     video_file_path: pathlib.Path,
 ) -> datetime.datetime | datetime.date:
-    # TODO: Add logging
+    # TODO: Cut the bottom left corner of the video to extract the timestamp
+    # TODO: Save the cut parts of the video if the timestamp couldn't be extracted
+
+    logger.debug(f"Video dimensions: width={video.size[0]}, height={video.size[1]}")
+    logger.debug(f"Total frames in video: {video.reader.nframes}")
+
     orig_width, orig_height = video.size
     total_frames = video.reader.nframes
 
     total_attempts = config.timestamp.video_max_attempts
+    logger.debug(f"Total attempts to extract timestamp: {total_attempts}")
+
     best_timestamp: datetime.datetime | datetime.date | None = None
 
-    for attempt in range(total_attempts):
+    for attempt in range(1, total_attempts + 1):
         frame_number = int((total_frames // total_attempts) * attempt)
+        logger.debug(
+            f"Attempt {attempt}/{total_attempts}: Extracting frame {frame_number}"
+        )
+
         img = image_fromarray(video.get_frame(frame_number))
 
         try:
             timestamp = parse_timestamp_from_image(img, config, video_file_path)
+            logger.debug(f"Timestamp successfully extracted: {timestamp}")
         except Exception:
+            logger.warning(
+                f"Failed to extract timestamp from frame {frame_number}", exc_info=True
+            )
             continue
 
         if isinstance(timestamp, datetime.datetime):
             best_timestamp = timestamp
+            logger.debug("Found a full datetime timestamp, stopping further attempts")
             break
 
         if isinstance(timestamp, datetime.date) and best_timestamp is not None:
             best_timestamp = timestamp
+            logger.debug(
+                "Found a date-only timestamp, continuing to search for a full datetime"
+            )
 
     if best_timestamp is None:
         raise ValueError(
             f"No timestamp found in the video after {total_attempts} attempts"
         )
 
+    logger.info(f"Best timestamp extracted: {best_timestamp}")
     return best_timestamp
 
 
