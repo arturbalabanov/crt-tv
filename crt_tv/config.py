@@ -25,8 +25,6 @@ DEFAULT_FONTS: list[str | pathlib.Path] = [
 #       remove the font, always use your own
 #       font is different for photos vs videos
 
-# TODO: Colors: allow basic names or #RRGGBB form
-
 
 class TimestampConfig(BaseModel):
     position: Literal["top left", "top right", "bottom left", "bottom right"] = Field(
