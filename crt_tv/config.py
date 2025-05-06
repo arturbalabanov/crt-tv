@@ -82,12 +82,18 @@ class TimestampConfig(BaseModel):
         return value
 
 
+class VideosConfig(BaseModel):
+    video_codec: str = "libx264"
+    audio_codec: str = "aac"
+
+
 class Config(BaseModel):
     source_files_dir: pathlib.Path
     output_files_dir: pathlib.Path
     aspect_ratio: str
     resize_method: Literal["stretch", "crop"]
     timestamp: TimestampConfig = Field(default_factory=TimestampConfig)
+    videos: VideosConfig = Field(default_factory=VideosConfig)
 
     @field_validator("source_files_dir")
     @classmethod

@@ -1,6 +1,8 @@
+import datetime
 import pathlib
 from typing import Annotated, TypedDict
 
+import moviepy.editor as mp
 import typer
 from loguru import logger
 from PIL.Image import open as image_open
@@ -12,6 +14,7 @@ from crt_tv.logging import configure_logging
 from crt_tv.timestamp import (
     get_timestamp_font,
     parse_timestamp_from_image,
+    parse_timestamp_from_video,
 )
 from crt_tv.video import process_single_video
 
@@ -106,27 +109,42 @@ def process_images() -> None:
 
 @app.command()
 def get_timestamp(file: pathlib.Path) -> None:
-    """Get the timestamp from an image"""
+    """Get the timestamp from an image or video file"""
 
     config = cli_state["config"]
 
     logger.info(f"Getting timestamp from {file.name}")
+    extracted_timestamp: datetime.datetime | datetime.date | None = None
 
-    with image_open(file) as img:
-        try:
-            image_timestamp = parse_timestamp_from_image(
-                img, config, failed_timestamp_filename=file.name
-            )
-        except ValueError:
-            logger.warning(f"No timestamp found in {file.name}")
-            image_timestamp = None
-        except RuntimeError as exc:
-            logger.opt(exception=True).warning(
-                f"Tesseract timed out while processing {file.name}"
-            )
-            raise typer.Exit(code=1) from exc
+    if file.suffix.lower() == ".jpg":
+        logger.info(f"File {file.name} is an image")
 
-    logger.info(f"Timestamp found: {image_timestamp}")
+        with image_open(file) as img:
+            try:
+                extracted_timestamp = parse_timestamp_from_image(
+                    img, config, failed_timestamp_filename=file.name
+                )
+            except ValueError:
+                logger.warning(f"No timestamp found in {file.name}")
+            except RuntimeError as exc:
+                logger.opt(exception=True).warning(
+                    f"Tesseract timed out while processing {file.name}"
+                )
+                raise typer.Exit(code=1) from exc
+    elif file.suffix.lower() == ".avi":
+        logger.info(f"File {file.name} is a video")
+
+        with mp.VideoFileClip(str(file.resolve())) as video:
+            extracted_timestamp = parse_timestamp_from_video(
+                video, config, video_file_path=file
+            )
+    else:
+        logger.warning(
+            f"File {file.name} is not a supported format, suffix must be .jpg or .avi"
+        )
+        raise typer.Exit(code=1)
+
+    logger.info(f"Timestamp found: {extracted_timestamp}")
 
 
 @app.command()
