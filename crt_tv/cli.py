@@ -1,23 +1,19 @@
-import datetime
 import pathlib
 from typing import Annotated, TypedDict
 
-import moviepy.editor as mp
-import moviepy.video.fx.all as vfx
 import typer
 from loguru import logger
 from PIL.Image import open as image_open
 
 from crt_tv.config import Config
 from crt_tv.fs_observer import observe_and_action_fs_events
-from crt_tv.images import get_new_dimensions, process_single_image
+from crt_tv.images import process_single_image
 from crt_tv.logging import configure_logging
 from crt_tv.timestamp import (
     get_timestamp_font,
     parse_timestamp_from_image,
-    parse_timestamp_from_video,
 )
-from crt_tv.utils import get_output_image_path
+from crt_tv.video import process_single_video
 
 
 class CLIState(TypedDict):
@@ -156,72 +152,4 @@ def run_observer(
 def process_video(file: pathlib.Path) -> None:
     config = cli_state["config"]
 
-    video = mp.VideoFileClip(str(file.resolve()))
-    timestamp_clip = None
-
-    try:
-        timestamp = parse_timestamp_from_video(video, config, file)
-    except Exception:
-        logger.opt(exception=True).warning(
-            f"Couldn't extract the timestamp from {file.name}, skipping adding it to the video",
-        )
-    else:
-        if isinstance(timestamp, datetime.datetime):
-            timestamp_text = timestamp.strftime(config.timestamp.full_format)
-        elif isinstance(timestamp, datetime.date):
-            logger.warning("Only date found in the video, using it as timestamp")
-            timestamp_text = timestamp.strftime(config.timestamp.date_format)
-        else:
-            raise TypeError(
-                f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
-            )
-
-        timestamp_clip = mp.TextClip(
-            font=config.timestamp.font_names[0],
-            txt=timestamp_text,
-            fontsize=config.timestamp.video_font_size,
-            color=config.timestamp.fg_color,
-            bg_color=config.timestamp.bg_color,
-        )
-
-    orig_width, orig_height = video.size
-    new_width, new_height = get_new_dimensions(
-        orig_width=orig_width,
-        orig_height=orig_height,
-        new_aspect_ratio=config.aspect_ratio,
-        resize_method=config.resize_method,
-    )
-
-    crop_x = (orig_width - new_width) // 2 if orig_width != new_width else 0
-    crop_y = (orig_height - new_height) // 2 if orig_height != new_height else 0
-
-    resized_video = vfx.crop(
-        video,
-        x1=crop_x,
-        y1=crop_y,
-        width=new_width,
-        height=new_height,
-    )
-
-    if timestamp_clip is not None:
-        y_pos, x_pos = config.timestamp.position.split(" ")
-
-        resized_video = mp.CompositeVideoClip(
-            [
-                resized_video,
-                timestamp_clip.set_duration(video.duration).set_pos(
-                    (0, new_height - 80)
-                ),
-            ]
-        )
-    dest_path = get_output_image_path(file, config).resolve().with_suffix(".mp4")
-
-    resized_video.write_videofile(
-        str(dest_path),
-        codec="libx264",
-        audio_codec="aac",
-    )
-
-    logger.info(
-        f"Processed video {file.name} to {dest_path.resolve()} with size {new_width}x{new_height}"
-    )
+    process_single_video(file, config)

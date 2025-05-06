@@ -15,7 +15,7 @@ from watchdog.observers import Observer
 from crt_tv.config import Config
 from crt_tv.images import process_single_image
 from crt_tv.timestamp import get_timestamp_font
-from crt_tv.utils import get_output_image_path
+from crt_tv.utils import get_output_path
 
 # FIXME: Created files are not used to the correct dest path (missing PHOTO/)
 # TODO: Add a handler for video files (not processing them for now, simply copying them)
@@ -45,7 +45,7 @@ class ImageFileHandler(PatternMatchingEventHandler):
             logger.debug(f"Successfully processed file {file_path} -> {dest_path}")
 
     def _try_delete_processed_file(self, file_path: pathlib.Path) -> None:
-        processed_file_path = get_output_image_path(file_path, self.config)
+        processed_file_path = get_output_path(file_path, self.config)
 
         logger.debug(f"Deleting processed file {processed_file_path}")
 
@@ -84,8 +84,8 @@ class ImageFileHandler(PatternMatchingEventHandler):
             self._try_delete_processed_file(old_file_path)
             return
 
-        old_processed_file_path = get_output_image_path(old_file_path, self.config)
-        new_processed_file_path = get_output_image_path(new_file_path, self.config)
+        old_processed_file_path = get_output_path(old_file_path, self.config)
+        new_processed_file_path = get_output_path(new_file_path, self.config)
 
         try:
             logger.debug(
