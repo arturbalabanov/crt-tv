@@ -26,20 +26,20 @@ def process_single_video(
             )
         else:
             if isinstance(timestamp, datetime.datetime):
-                timestamp_text = timestamp.strftime(config.timestamp.full_format)
+                timestamp_text = timestamp.strftime(config.videos.timestamp.full_format)
             elif isinstance(timestamp, datetime.date):
                 logger.warning("Only date found in the video, using it as timestamp")
-                timestamp_text = timestamp.strftime(config.timestamp.date_format)
+                timestamp_text = timestamp.strftime(config.videos.timestamp.date_format)
             else:
                 raise TypeError(
                     f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
                 )
 
             timestamp_text_clip = mp.TextClip(
-                font=config.timestamp.font_names[0],
+                font=config.videos.timestamp.font_names[0],
                 txt=timestamp_text,
-                fontsize=config.timestamp.video_font_size,
-                color=config.timestamp.fg_color,
+                fontsize=config.videos.timestamp.font_size,
+                color=config.videos.timestamp.fg_color,
             )
 
         orig_width, orig_height = video.size
@@ -64,18 +64,14 @@ def process_single_video(
         if timestamp_text_clip is not None:
             timestamp_text_width, timestamp_text_height = timestamp_text_clip.size
             bg_rect_width = (
-                config.videos.timestamp.padding_left
-                + timestamp_text_width
-                + config.videos.timestamp.padding_right
+                config.videos.timestamp.padding_left + timestamp_text_width + config.videos.timestamp.padding_right
             )
             bg_rect_height = (
-                config.videos.timestamp.padding_top
-                + timestamp_text_height
-                + config.videos.timestamp.padding_bottom
+                config.videos.timestamp.padding_top + timestamp_text_height + config.videos.timestamp.padding_bottom
             )
 
             bg_rect_clip = mp.ColorClip(
-                color=config.timestamp.bg_color_rgb,
+                color=config.videos.timestamp.bg_color_rgb,
                 size=(bg_rect_width, bg_rect_height),
             )
 
@@ -95,28 +91,16 @@ def process_single_video(
                 case _:
                     raise RuntimeError("invalid branch")
 
-            bg_rect_x = (
-                timestamp_x
-                + config.videos.timestamp.margin_left
-                - config.videos.timestamp.margin_right
-            )
-            bg_rect_y = (
-                timestamp_y
-                + config.videos.timestamp.margin_top
-                - config.videos.timestamp.margin_bottom
-            )
+            bg_rect_x = timestamp_x + config.videos.timestamp.margin_left - config.videos.timestamp.margin_right
+            bg_rect_y = timestamp_y + config.videos.timestamp.margin_top - config.videos.timestamp.margin_bottom
             timestamp_text_x = bg_rect_x + config.videos.timestamp.padding_left
             timestamp_text_y = bg_rect_y + config.videos.timestamp.padding_top
 
             resized_video = mp.CompositeVideoClip(
                 [
                     resized_video,
-                    bg_rect_clip.set_duration(video.duration).set_pos(
-                        (bg_rect_x, bg_rect_y)
-                    ),
-                    timestamp_text_clip.set_duration(video.duration).set_pos(
-                        (timestamp_text_x, timestamp_text_y)
-                    ),
+                    bg_rect_clip.set_duration(video.duration).set_pos((bg_rect_x, bg_rect_y)),
+                    timestamp_text_clip.set_duration(video.duration).set_pos((timestamp_text_x, timestamp_text_y)),
                 ]
             )
         dest_path = get_output_path(video_path, config)
@@ -127,8 +111,6 @@ def process_single_video(
             audio_codec=config.videos.audio_codec,
         )
 
-    logger.info(
-        f"Processed video {video_path.name} to {dest_path.resolve()} with size {new_width}x{new_height}"
-    )
+    logger.info(f"Processed video {video_path.name} to {dest_path.resolve()} with size {new_width}x{new_height}")
 
     return dest_path

@@ -14,23 +14,17 @@ from crt_tv.timestamp import parse_timestamp_from_image
 from crt_tv.utils import get_output_path
 
 
-def process_single_image(
-    image_path: pathlib.Path, config: Config, timestamp_font: FreeTypeFont
-) -> pathlib.Path:
+def process_single_image(image_path: pathlib.Path, config: Config, timestamp_font: FreeTypeFont) -> pathlib.Path:
     logger.info(f"Processing {image_path.name}")
 
     with image_open(image_path) as img:
         try:
-            image_timestamp = parse_timestamp_from_image(
-                img, config, failed_timestamp_filename=image_path.name
-            )
+            image_timestamp = parse_timestamp_from_image(img, config, failed_timestamp_filename=image_path.name)
         except ValueError:
             logger.warning(f"No timestamp found in {image_path.name}")
             image_timestamp = None
         except RuntimeError:
-            logger.opt(exception=True).warning(
-                f"Tesseract timed out while processing {image_path.name}"
-            )
+            logger.opt(exception=True).warning(f"Tesseract timed out while processing {image_path.name}")
             image_timestamp = None
 
         resized_img = resize_image(
@@ -55,9 +49,7 @@ def process_single_image(
     return output_image_path
 
 
-def resize_image(
-    img: Image, new_aspect_ratio: str, *, resize_method: Literal["stretch", "crop"]
-) -> Image:
+def resize_image(img: Image, new_aspect_ratio: str, *, resize_method: Literal["stretch", "crop"]) -> Image:
     orig_width, orig_height = img.size
 
     new_width, new_height = get_new_dimensions(
@@ -77,9 +69,7 @@ def resize_image(
 
         resized_img = img.crop((left, top, right, bottom))
     else:
-        raise ValueError(
-            f"Invalid resize method '{resize_method}', must be 'stretch' or 'crop'"
-        )
+        raise ValueError(f"Invalid resize method '{resize_method}', must be 'stretch' or 'crop'")
     return resized_img
 
 
@@ -93,14 +83,12 @@ def draw_timestamp(
     # NOTE: It's important to check for datetime first since datetime is a subclass of date
 
     if isinstance(timestamp, datetime.datetime):
-        timestamp_text = timestamp.strftime(config.timestamp.full_format)
+        timestamp_text = timestamp.strftime(config.images.timestamp.full_format)
     elif isinstance(timestamp, datetime.date):
         logger.warning("Only date found in the image, using it as timestamp")
-        timestamp_text = timestamp.strftime(config.timestamp.date_format)
+        timestamp_text = timestamp.strftime(config.images.timestamp.date_format)
     else:
-        raise TypeError(
-            f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}"
-        )
+        raise TypeError(f"timestamp must be a datetime.datetime or datetime.date instance, got {type(timestamp)}")
 
     draw = Draw(img)
     text_bbox_left, text_bbox_top, text_bbox_right, text_bbox_bottom = draw.textbbox(
@@ -116,22 +104,22 @@ def draw_timestamp(
     right_x = int(
         img.width
         - text_width
-        - config.timestamp.margin_left
-        - config.timestamp.margin_right
-        - config.timestamp.padding_left
-        - config.timestamp.padding_right
+        - config.images.timestamp.margin_left
+        - config.images.timestamp.margin_right
+        - config.images.timestamp.padding_left
+        - config.images.timestamp.padding_right
     )
     top_y = 0
     bottom_y = int(
         img.height
         - text_height
-        - config.timestamp.margin_top
-        - config.timestamp.margin_bottom
-        - config.timestamp.padding_top
-        - config.timestamp.padding_bottom
+        - config.images.timestamp.margin_top
+        - config.images.timestamp.margin_bottom
+        - config.images.timestamp.padding_top
+        - config.images.timestamp.padding_bottom
     )
 
-    match config.timestamp.position:
+    match config.images.timestamp.position:
         case "top left":
             timestamp_x, timestamp_y = (left_x, top_y)
         case "top right":
@@ -143,31 +131,25 @@ def draw_timestamp(
         case _:
             raise RuntimeError("invalid branch")
 
-    bg_rect_left = timestamp_x + config.timestamp.margin_left
-    bg_rect_top = timestamp_y + config.timestamp.margin_top
+    bg_rect_left = timestamp_x + config.images.timestamp.margin_left
+    bg_rect_top = timestamp_y + config.images.timestamp.margin_top
     bg_rect_right = (
-        bg_rect_left
-        + config.timestamp.padding_left
-        + text_width
-        + config.timestamp.padding_right
+        bg_rect_left + config.images.timestamp.padding_left + text_width + config.images.timestamp.padding_right
     )
     bg_rect_bottom = (
-        bg_rect_top
-        + config.timestamp.padding_top
-        + text_height
-        + config.timestamp.padding_bottom
+        bg_rect_top + config.images.timestamp.padding_top + text_height + config.images.timestamp.padding_bottom
     )
 
-    text_x = bg_rect_left + config.timestamp.padding_left
-    text_y = bg_rect_top - text_bbox_top + config.timestamp.padding_top
+    text_x = bg_rect_left + config.images.timestamp.padding_left
+    text_y = bg_rect_top - text_bbox_top + config.images.timestamp.padding_top
 
     draw.rectangle(
         (bg_rect_left, bg_rect_top, bg_rect_right, bg_rect_bottom),
-        fill=config.timestamp.bg_color,
+        fill=config.images.timestamp.bg_color,
     )
     draw.text(
         xy=(text_x, text_y),
         text=timestamp_text,
-        fill=config.timestamp.fg_color,
+        fill=config.images.timestamp.fg_color,
         font=font,
     )

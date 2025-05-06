@@ -20,21 +20,11 @@ DEFAULT_FONTS: list[str | pathlib.Path] = [
     "FreeMonoBold.ttf",
 ]
 
-# TODO: Clean up this mess:
-#       seperate photo vs video vs common settings
-#       remove the font, always use your own
-#       font is different for photos vs videos
-
 
 class TimestampConfig(BaseModel):
     position: Literal["top left", "top right", "bottom left", "bottom right"] = Field(
         default="bottom left",
         description="Position of the timestamp to be appended to the image",
-    )
-
-    failed_timestamp_extracts_dir: pathlib.Path | None = Field(
-        default=None,
-        description="A directory which will contain the cut parts of the images where the timestamp extraction failed",
     )
     date_format: str = "%-d %b %Y"  # e.g. 6 Nov 2024
     full_format: str = "%-d %b %Y %H:%M:%S"  # e.g. 6 Nov 2024 19:49:02
@@ -68,34 +58,7 @@ class TimestampConfig(BaseModel):
         ).strip(),
     )
     font_size: int = 80
-    video_font_size: int = 48
     detect_timeout_seconds: int = 30
-    video_max_attempts: int = 10
-
-    @field_validator("failed_timestamp_extracts_dir")
-    @classmethod
-    def validate_failed_timestamp_extracts_dir(
-        cls, value: pathlib.Path | None
-    ) -> pathlib.Path | None:
-        if value is None:
-            return None
-
-        if not value.is_absolute():
-            raise ValueError(
-                f"failed_timestamp_extracts_dir: Path must be absolute: {value}"
-            )
-
-        if not value.exists():
-            logger.info(
-                f"failed_timestamp_extracts_dir: Directory does not exist, creating: {value}"
-            )
-            value.mkdir(parents=True, exist_ok=True)
-        elif not value.is_dir():
-            raise ValueError(
-                f"failed_timestamp_extracts_dir: Path is not a directory: {value}"
-            )
-
-        return value
 
     @property
     def fg_color_rgb(self) -> tuple[int, int, int] | tuple[int, int, int, int]:
@@ -106,7 +69,19 @@ class TimestampConfig(BaseModel):
         return PIL.ImageColor.getrgb(self.bg_color)
 
 
-class TimestampVideosConfig(BaseModel):
+class TimestampImagesConfig(TimestampConfig):
+    margin_left: int = 0
+    margin_right: int = 0
+    margin_top: int = 0
+    margin_bottom: int = 30
+    padding_left: int = 130
+    padding_right: int = 100
+    padding_top: int = 30
+    padding_bottom: int = 30
+    font_size: int = 80
+
+
+class TimestampVideosConfig(TimestampConfig):
     position: Literal["top left", "top right", "bottom left", "bottom right"] = Field(
         default="bottom left",
         description="Position of the timestamp to be appended to the video",
@@ -119,6 +94,8 @@ class TimestampVideosConfig(BaseModel):
     padding_right: int = 15
     padding_top: int = 15
     padding_bottom: int = 15
+    font_size: int = 48
+    max_attempts: int = 10
 
 
 class VideosConfig(BaseModel):
@@ -127,12 +104,20 @@ class VideosConfig(BaseModel):
     timestamp: TimestampVideosConfig = Field(default_factory=TimestampVideosConfig)
 
 
+class ImagesConfig(BaseModel):
+    timestamp: TimestampImagesConfig = Field(default_factory=TimestampImagesConfig)
+
+
 class Config(BaseModel):
     source_files_dir: pathlib.Path
     output_files_dir: pathlib.Path
+    failed_timestamp_extracts_dir: pathlib.Path | None = Field(
+        default=None,
+        description="A directory which will contain the cut parts of the images where the timestamp extraction failed",
+    )
     aspect_ratio: str
     resize_method: Literal["stretch", "crop"]
-    timestamp: TimestampConfig = Field(default_factory=TimestampConfig)
+    images: ImagesConfig = Field(default_factory=ImagesConfig)
     videos: VideosConfig = Field(default_factory=VideosConfig)
 
     @field_validator("source_files_dir")
@@ -156,9 +141,7 @@ class Config(BaseModel):
             raise ValueError(f"output_files_dir: Path must be absolute: {value}")
 
         if not value.exists():
-            logger.info(
-                f"output_files_dir: Directory does not exist, creating: {value}"
-            )
+            logger.info(f"output_files_dir: Directory does not exist, creating: {value}")
             value.mkdir(parents=True, exist_ok=True)
         elif not value.is_dir():
             raise ValueError(f"output_files_dir: Path is not a directory: {value}")
@@ -172,9 +155,24 @@ class Config(BaseModel):
     @classmethod
     def validate_aspect_ratio(cls, value: str) -> str:
         if not ASPECT_RATIO_REGEX.match(value):
-            raise ValueError(
-                f"Invalid aspect ratio '{value}', must be in the form 'width:height' (e.g. '4:3')"
-            )
+            raise ValueError(f"Invalid aspect ratio '{value}', must be in the form 'width:height' (e.g. '4:3')")
+
+        return value
+
+    @field_validator("failed_timestamp_extracts_dir")
+    @classmethod
+    def validate_failed_timestamp_extracts_dir(cls, value: pathlib.Path | None) -> pathlib.Path | None:
+        if value is None:
+            return None
+
+        if not value.is_absolute():
+            raise ValueError(f"failed_timestamp_extracts_dir: Path must be absolute: {value}")
+
+        if not value.exists():
+            logger.info(f"failed_timestamp_extracts_dir: Directory does not exist, creating: {value}")
+            value.mkdir(parents=True, exist_ok=True)
+        elif not value.is_dir():
+            raise ValueError(f"failed_timestamp_extracts_dir: Path is not a directory: {value}")
 
         return value
 

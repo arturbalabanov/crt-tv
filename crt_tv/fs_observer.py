@@ -14,7 +14,7 @@ from watchdog.observers import Observer
 
 from crt_tv.config import Config
 from crt_tv.images import process_single_image
-from crt_tv.timestamp import get_timestamp_font
+from crt_tv.timestamp import get_images_timestamp_font
 from crt_tv.utils import get_output_path
 
 # FIXME: Created files are not used to the correct dest path (missing PHOTO/)
@@ -36,9 +36,7 @@ class ImageFileHandler(PatternMatchingEventHandler):
             return
 
         try:
-            dest_path = process_single_image(
-                file_path, self.config, get_timestamp_font(self.config)
-            )
+            dest_path = process_single_image(file_path, self.config, get_images_timestamp_font(self.config))
         except Exception:
             logger.exception(f"Error processing file {file_path}")
         else:
@@ -88,18 +86,12 @@ class ImageFileHandler(PatternMatchingEventHandler):
         new_processed_file_path = get_output_path(new_file_path, self.config)
 
         try:
-            logger.debug(
-                f"Moving processed file {old_processed_file_path} -> {new_processed_file_path}"
-            )
+            logger.debug(f"Moving processed file {old_processed_file_path} -> {new_processed_file_path}")
             shutil.move(old_processed_file_path, new_processed_file_path)
         except Exception:
-            logger.exception(
-                f"Error moving file {old_processed_file_path} -> {new_processed_file_path}"
-            )
+            logger.exception(f"Error moving file {old_processed_file_path} -> {new_processed_file_path}")
         else:
-            logger.debug(
-                f"Successfully moved file {old_processed_file_path} -> {new_processed_file_path}"
-            )
+            logger.debug(f"Successfully moved file {old_processed_file_path} -> {new_processed_file_path}")
 
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
@@ -113,16 +105,12 @@ def observe_and_action_fs_events(
     recursive: bool = True,
     sleep_time: float = 0.1,
 ) -> None:
-    logger.info(
-        f"Starting to observe file system events for source files in {config.source_files_dir}"
-    )
+    logger.info(f"Starting to observe file system events for source files in {config.source_files_dir}")
 
     images_handler = ImageFileHandler(config)
     observer = Observer()
 
-    observer.schedule(
-        images_handler, str(config.source_files_dir.resolve()), recursive=recursive
-    )
+    observer.schedule(images_handler, str(config.source_files_dir.resolve()), recursive=recursive)
     observer.start()
 
     try:

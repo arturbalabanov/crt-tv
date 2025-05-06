@@ -12,9 +12,7 @@ def get_new_dimensions(
     aspect_ratio_match = ASPECT_RATIO_REGEX.match(new_aspect_ratio)
 
     if not aspect_ratio_match:
-        raise ValueError(
-            f"Invalid aspect ratio '{new_aspect_ratio}', must be in the form 'width:height'"
-        )
+        raise ValueError(f"Invalid aspect ratio '{new_aspect_ratio}', must be in the form 'width:height'")
 
     aspect_ratio_width = int(aspect_ratio_match.group("width"))
     aspect_ratio_height = int(aspect_ratio_match.group("height"))
@@ -31,8 +29,6 @@ def get_new_dimensions(
             new_width = orig_width
             new_height = int(orig_width / aspect_ratio)
     else:
-        raise ValueError(
-            f"Invalid resize method '{resize_method}', must be 'stretch' or 'crop'"
-        )
+        raise ValueError(f"Invalid resize method '{resize_method}', must be 'stretch' or 'crop'")
 
     return new_width, new_height

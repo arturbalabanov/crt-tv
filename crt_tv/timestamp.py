@@ -49,24 +49,20 @@ def parse_timestamp_from_image(
     logger.debug("Extracting all text from from the cut part of the image")
 
     extracted_text = pytesseract.image_to_string(
-        timestamp_region, timeout=config.timestamp.detect_timeout_seconds
+        timestamp_region, timeout=config.images.timestamp.detect_timeout_seconds
     )
 
     logger.debug(f"Extracted text: '{extracted_text}'")
 
     match = TIMESTAMP_PARSE_REGEX.search(extracted_text)
 
-    failed_timestamp_extracts_dir = config.timestamp.failed_timestamp_extracts_dir
+    failed_timestamp_extracts_dir = config.failed_timestamp_extracts_dir
 
     if failed_timestamp_extracts_dir and (not match or match.group("time") is None):
         timestamp_path = failed_timestamp_extracts_dir / failed_timestamp_filename
-        relative_timestamp_path = timestamp_path.relative_to(
-            failed_timestamp_extracts_dir.parent
-        )
+        relative_timestamp_path = timestamp_path.relative_to(failed_timestamp_extracts_dir.parent)
 
-        logger.info(
-            f"Couldn't extract the timestamp, saving the cut part of the image to {relative_timestamp_path}"
-        )
+        logger.info(f"Couldn't extract the timestamp, saving the cut part of the image to {relative_timestamp_path}")
 
         failed_timestamp_extracts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -109,15 +105,13 @@ def parse_timestamp_from_video(
     orig_width, orig_height = video.size
     total_frames = video.reader.nframes
 
-    total_attempts = config.timestamp.video_max_attempts
+    total_attempts = config.videos.timestamp.max_attempts
     logger.debug(f"Total attempts to extract timestamp: {total_attempts}")
 
     best_timestamp: datetime.datetime | datetime.date | None = None
 
     for attempt in range(0, total_attempts):
-        frame_number = min(
-            int((total_frames // total_attempts) * attempt), total_frames
-        )
+        frame_number = min(int((total_frames // total_attempts) * attempt), total_frames)
         frame_time = min(frame_number / video.fps, video.duration)
 
         logger.debug(
@@ -146,29 +140,25 @@ def parse_timestamp_from_video(
 
         if isinstance(timestamp, datetime.date) and best_timestamp is not None:
             best_timestamp = timestamp
-            logger.debug(
-                "Found a date-only timestamp, continuing to search for a full datetime"
-            )
+            logger.debug("Found a date-only timestamp, continuing to search for a full datetime")
 
     if best_timestamp is None:
-        raise ValueError(
-            f"No timestamp found in the video after {total_attempts} attempts"
-        )
+        raise ValueError(f"No timestamp found in the video after {total_attempts} attempts")
 
     logger.info(f"Best timestamp extracted: {best_timestamp}")
     return best_timestamp
 
 
-def get_timestamp_font(config: Config) -> FreeTypeFont:
+def get_images_timestamp_font(config: Config) -> FreeTypeFont:
     logger.info("Searching for timestamp font")
 
-    for font_name in config.timestamp.font_names:
+    for font_name in config.images.timestamp.font_names:
         try:
-            font = truetype(font_name, config.timestamp.font_size)
+            font = truetype(font_name, config.images.timestamp.font_size)
         except OSError:
             logger.warning(f"Font '{font_name}' not found, trying next font")
         else:
             logger.info(f"Using timestamp font: {font_name}")
             return font
 
-    raise OSError(f"None of the fonts {config.timestamp.font_names} were found")
+    raise OSError(f"None of the fonts {config.images.timestamp.font_names} were found")

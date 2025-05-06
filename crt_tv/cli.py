@@ -12,7 +12,7 @@ from crt_tv.fs_observer import observe_and_action_fs_events
 from crt_tv.images import process_single_image
 from crt_tv.logging import configure_logging
 from crt_tv.timestamp import (
-    get_timestamp_font,
+    get_images_timestamp_font,
     parse_timestamp_from_image,
     parse_timestamp_from_video,
 )
@@ -63,17 +63,13 @@ def main(
     configure_logging(stdout_level="DEBUG" if verbose else "INFO")
 
     if not config_file.is_absolute():
-        raise typer.BadParameter(
-            f"--config-file: {config_file} is not an absolute path"
-        )
+        raise typer.BadParameter(f"--config-file: {config_file} is not an absolute path")
 
     if not config_file.is_file():
         raise typer.BadParameter(f"--config-file: {config_file} is not a file")
 
     if config_file.suffix != ".toml":
-        raise typer.BadParameter(
-            f"--config-file: {config_file} is not a TOML file, must be .toml"
-        )
+        raise typer.BadParameter(f"--config-file: {config_file} is not a TOML file, must be .toml")
 
     logger.info(f"Loading configuration from {config_file}")
     cli_state["config"] = Config.load_from_file(config_file)
@@ -91,7 +87,7 @@ def process(
     """Resize images and videos in the source directory to the specified aspect ratio and optionally add a timestamp"""
 
     config = cli_state["config"]
-    timestamp_font = get_timestamp_font(config)
+    timestamp_font = get_images_timestamp_font(config)
 
     if file_path is None:
         source_files_dir = config.source_files_dir
@@ -103,9 +99,7 @@ def process(
         elif file_path.suffix.lower() == ".avi":
             process_single_video(file_path, config)
         else:
-            logger.error(
-                f"File {file_path.name} is not a supported format, suffix must be .jpg or .avi"
-            )
+            logger.error(f"File {file_path.name} is not a supported format, suffix must be .jpg or .avi")
             raise typer.Exit(code=1)
 
         return
@@ -139,13 +133,9 @@ def process(
             process_single_video(file_path, config)
             processed_videos_count += 1
         else:
-            logger.warning(
-                f"File {file_path.name} is not a supported format, suffix must be .jpg or .avi, skipping"
-            )
+            logger.warning(f"File {file_path.name} is not a supported format, suffix must be .jpg or .avi, skipping")
 
-    logger.info(
-        f"Processed {processed_images_count} images and {processed_videos_count} videos"
-    )
+    logger.info(f"Processed {processed_images_count} images and {processed_videos_count} videos")
 
 
 @app.command()
@@ -162,27 +152,19 @@ def get_timestamp(file: pathlib.Path) -> None:
 
         with image_open(file) as img:
             try:
-                extracted_timestamp = parse_timestamp_from_image(
-                    img, config, failed_timestamp_filename=file.name
-                )
+                extracted_timestamp = parse_timestamp_from_image(img, config, failed_timestamp_filename=file.name)
             except ValueError:
                 logger.warning(f"No timestamp found in {file.name}")
             except RuntimeError as exc:
-                logger.opt(exception=True).warning(
-                    f"Tesseract timed out while processing {file.name}"
-                )
+                logger.opt(exception=True).warning(f"Tesseract timed out while processing {file.name}")
                 raise typer.Exit(code=1) from exc
     elif file.suffix.lower() == ".avi":
         logger.info(f"File {file.name} is a video")
 
         with mp.VideoFileClip(str(file.resolve())) as video:
-            extracted_timestamp = parse_timestamp_from_video(
-                video, config, video_file_path=file
-            )
+            extracted_timestamp = parse_timestamp_from_video(video, config, video_file_path=file)
     else:
-        logger.warning(
-            f"File {file.name} is not a supported format, suffix must be .jpg or .avi"
-        )
+        logger.warning(f"File {file.name} is not a supported format, suffix must be .jpg or .avi")
         raise typer.Exit(code=1)
 
     logger.info(f"Timestamp found: {extracted_timestamp}")
@@ -194,9 +176,7 @@ def run_observer(
         bool,
         typer.Option(help="Should the observer check for files in nested directories"),
     ] = True,
-    sleep_time: Annotated[
-        float, typer.Option(help="How often (in seconds) to check for fs events")
-    ] = 0.1,
+    sleep_time: Annotated[float, typer.Option(help="How often (in seconds) to check for fs events")] = 0.1,
 ) -> None:
     """Run the file system observer to automatically process images from the source directory"""
 
