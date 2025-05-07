@@ -10,7 +10,7 @@ from watchdog.events import (
     FileMovedEvent,
     PatternMatchingEventHandler,
 )
-from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver
 
 from crt_tv.config import Config
 from crt_tv.images import process_single_image
@@ -32,23 +32,6 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         self.timestamp_font = get_images_timestamp_font(config)
 
     def _try_process_file(self, file_path: pathlib.Path) -> None:
-        if file_path.name.startswith("."):
-            logger.debug(f"Skipping processing hidden file {file_path}")
-            return
-
-        start_wait = time.time()
-        while (file_path.parent / f"._{file_path.name}").exists():
-            logger.debug(
-                f"File {file_path} is still being written to, waiting for it to be released"
-            )
-            time.sleep(1)
-
-            if time.time() - start_wait > 60:
-                logger.warning(
-                    f"File {file_path} is taking too long to be released (1 min), skipping"
-                )
-                return
-
         try:
             if file_path.suffix.lower() == ".jpg":
                 dest_path = process_single_image(
@@ -67,10 +50,6 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
             logger.debug(f"Successfully processed file {file_path} -> {dest_path}")
 
     def _try_delete_processed_file(self, file_path: pathlib.Path) -> None:
-        if file_path.name.startswith("."):
-            logger.debug(f"Skipping deleting hidden file {file_path}")
-            return
-
         processed_file_path = get_output_path(file_path, self.config)
 
         logger.debug(f"Deleting processed file {processed_file_path}")
@@ -144,7 +123,7 @@ def observe_and_action_fs_events(
     )
 
     file_handler = RetrosnapFileHandler(config)
-    observer = Observer()
+    observer = PollingObserver()
 
     observer.schedule(
         file_handler, str(config.source_files_dir.resolve()), recursive=recursive
