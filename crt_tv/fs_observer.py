@@ -63,7 +63,7 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
 
             if kodi.is_kodi_running():
                 logger.debug("Kodi is running, refreshing slideshow")
-                kodi.refresh_slideshow()
+                kodi.refresh_slideshow(self.config)
 
     def _try_delete_processed_file(self, file_path: pathlib.Path) -> None:
         if file_path.name.startswith("."):
@@ -85,7 +85,7 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
 
             if kodi.is_kodi_running():
                 logger.debug("Kodi is running, refreshing slideshow")
-                kodi.refresh_slideshow()
+                kodi.refresh_slideshow(self.config)
 
     def on_created(self, event: FileCreatedEvent) -> None:  # type: ignore[override]
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
@@ -145,7 +145,7 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
 
             if kodi.is_kodi_running():
                 logger.debug("Kodi is running, refreshing slideshow")
-                kodi.refresh_slideshow()
+                kodi.refresh_slideshow(self.config)
 
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]

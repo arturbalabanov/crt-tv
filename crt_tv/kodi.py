@@ -43,9 +43,9 @@ def start_slideshow(config: Config) -> None:
 
 
 @require_kodi_running
-def refresh_slideshow() -> None:
+def refresh_slideshow(config: Config) -> None:
     kodi_send("Back")
-    start_slideshow()
+    start_slideshow(config)
 
 
 @require_kodi_running
