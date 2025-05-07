@@ -75,12 +75,14 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file created: {file_path}")
+        logger.debug(f"event is synthetic: {event.is_synthetic}")
 
         self._try_process_file(file_path)
 
     def on_modified(self, event: FileModifiedEvent) -> None:  # type: ignore[override]
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file modified: {file_path}")
+        logger.debug(f"event is synthetic: {event.is_synthetic}")
 
         if file_path.name.startswith("."):
             logger.debug(f"Skipping processing hidden file {file_path}")
@@ -100,6 +102,7 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         new_file_path = pathlib.Path(event.dest_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file moved: {old_file_path} -> {new_file_path}")
+        logger.debug(f"event is synthetic: {event.is_synthetic}")
 
         # check if moved outside of self.config.source_files_dir
         if not new_file_path.is_relative_to(self.config.source_files_dir):
@@ -127,6 +130,7 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file deleted: {old_file_path}")
+        logger.debug(f"event is synthetic: {event.is_synthetic}")
         self._try_delete_processed_file(old_file_path)
 
 
@@ -150,6 +154,7 @@ def observe_and_action_fs_events(
 
     # TODO: Add kodi integration -- when there are no tasks in the queue for N seconds,
     #       regresh the Kodi library and re-start the slideshow (if necessary)
+    #       I think I can use observer.event_queue to check for this
 
     try:
         while True:
