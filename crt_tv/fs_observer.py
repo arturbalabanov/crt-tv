@@ -12,13 +12,12 @@ from watchdog.events import (
 )
 from watchdog.observers.polling import PollingObserver
 
+from crt_tv import kodi
 from crt_tv.config import Config
 from crt_tv.images import process_single_image
 from crt_tv.timestamp import get_images_timestamp_font
 from crt_tv.utils import get_output_path
 from crt_tv.video import process_single_video
-
-# FIXME: Created files are not used to the correct dest path (missing PHOTO/)
 
 
 class RetrosnapFileHandler(PatternMatchingEventHandler):
@@ -62,6 +61,10 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         else:
             logger.debug(f"Successfully processed file {file_path} -> {dest_path}")
 
+            if kodi.is_kodi_running():
+                logger.debug("Kodi is running, refreshing slideshow")
+                kodi.refresh_slideshow()
+
     def _try_delete_processed_file(self, file_path: pathlib.Path) -> None:
         if file_path.name.startswith("."):
             logger.debug(f"Skipping deleting hidden file {file_path}")
@@ -79,6 +82,10 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
             logger.exception(f"Error deleting file {processed_file_path}")
         else:
             logger.debug(f"Successfully deleted file {processed_file_path}")
+
+            if kodi.is_kodi_running():
+                logger.debug("Kodi is running, refreshing slideshow")
+                kodi.refresh_slideshow()
 
     def on_created(self, event: FileCreatedEvent) -> None:  # type: ignore[override]
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
@@ -136,6 +143,10 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
                 f"Successfully moved file {old_processed_file_path} -> {new_processed_file_path}"
             )
 
+            if kodi.is_kodi_running():
+                logger.debug("Kodi is running, refreshing slideshow")
+                kodi.refresh_slideshow()
+
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file deleted: {old_file_path}")
@@ -159,12 +170,6 @@ def observe_and_action_fs_events(
         file_handler, str(config.source_files_dir.resolve()), recursive=recursive
     )
     observer.start()
-
-    # TODO: Add kodi integration -- when there are no tasks in the queue for N seconds,
-    #       regresh the Kodi library and re-start the slideshow (if necessary)
-    #       I think I can use observer.event_queue to check for this
-    #       Or maybe much simpler and more robust -- check if all files in source_files_dir
-    #       have a corresponding processed file in output_files_dir (excluging hidden files)
 
     try:
         while True:
