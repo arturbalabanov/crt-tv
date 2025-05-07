@@ -36,6 +36,15 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
             logger.debug(f"Skipping processing hidden file {file_path}")
             return
 
+        # Adding one second sleep will ensure that the check bellow will be correct
+        # This is because sometimes the ._ file is created after the main file
+        # (or at least that's the order they were detected)
+        time.sleep(1)
+
+        if (file_path.parent / f"._{file_path.name}").exists():
+            logger.debug(f"Skipping processing temporary file {file_path}")
+            return
+
         try:
             if file_path.suffix.lower() == ".jpg":
                 dest_path = process_single_image(
@@ -75,14 +84,12 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file created: {file_path}")
-        logger.debug(f"event is synthetic: {event.is_synthetic}")
 
         self._try_process_file(file_path)
 
     def on_modified(self, event: FileModifiedEvent) -> None:  # type: ignore[override]
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file modified: {file_path}")
-        logger.debug(f"event is synthetic: {event.is_synthetic}")
 
         if file_path.name.startswith("."):
             logger.debug(f"Skipping processing hidden file {file_path}")
@@ -102,7 +109,6 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         new_file_path = pathlib.Path(event.dest_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file moved: {old_file_path} -> {new_file_path}")
-        logger.debug(f"event is synthetic: {event.is_synthetic}")
 
         # check if moved outside of self.config.source_files_dir
         if not new_file_path.is_relative_to(self.config.source_files_dir):
@@ -130,7 +136,6 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file deleted: {old_file_path}")
-        logger.debug(f"event is synthetic: {event.is_synthetic}")
         self._try_delete_processed_file(old_file_path)
 
 
