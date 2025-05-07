@@ -80,10 +80,20 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
 
     def on_modified(self, event: FileModifiedEvent) -> None:  # type: ignore[override]
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
+        logger.debug(f"Detected file modified: {file_path}")
 
-        # Simply opening the file file in Finder causes a modification event, so we just ignore it,
-        # on_created, on_deleted and on_moved should be enough
-        logger.debug(f"Detected file modified: {file_path}, ignoring")
+        if file_path.name.startswith("."):
+            logger.debug(f"Skipping processing hidden file {file_path}")
+            return
+
+        processed_file_path = get_output_path(file_path, self.config)
+        if processed_file_path.exists():
+            logger.debug(
+                f"Processed file already exists: {processed_file_path}, skipping processing it again"
+            )
+            return
+
+        self._try_process_file(file_path)
 
     def on_moved(self, event: FileMovedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
