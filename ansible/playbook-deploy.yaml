@@ -15,6 +15,15 @@
           - ffmpeg
           - git
 
+    # ref: https://github.com/Zulko/moviepy/issues/401#issuecomment-278679961
+    - name: Update the ImageMagic's security policy
+      ansible.builtin.template:
+        src: templates/image-magick-6-policy.xml.jinja2
+        dest: /etc/ImageMagick-6/policy.xml
+        group: root
+        owner: root
+        mode: 0644
+
     - name: Check if uv is installed
       ansible.builtin.command: uv --version
       register: uv_installed
