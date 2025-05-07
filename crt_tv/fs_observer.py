@@ -36,6 +36,19 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
             logger.debug(f"Skipping processing hidden file {file_path}")
             return
 
+        start_wait = time.time()
+        while (file_path.parent / f"._{file_path.name}").exists():
+            logger.debug(
+                f"File {file_path} is still being written to, waiting for it to be released"
+            )
+            time.sleep(1)
+
+            if time.time() - start_wait > 60:
+                logger.warning(
+                    f"File {file_path} is taking too long to be released (1 min), skipping"
+                )
+                return
+
         try:
             if file_path.suffix.lower() == ".jpg":
                 dest_path = process_single_image(
