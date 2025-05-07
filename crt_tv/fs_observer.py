@@ -16,19 +16,20 @@ from crt_tv.config import Config
 from crt_tv.images import process_single_image
 from crt_tv.timestamp import get_images_timestamp_font
 from crt_tv.utils import get_output_path
+from crt_tv.video import process_single_video
 
 # FIXME: Created files are not used to the correct dest path (missing PHOTO/)
-# TODO: Add a handler for video files (not processing them for now, simply copying them)
 
 
-class ImageFileHandler(PatternMatchingEventHandler):
+class RetrosnapFileHandler(PatternMatchingEventHandler):
     def __init__(self, config: Config) -> None:
         super().__init__(
-            patterns=["*.jpg"],
+            patterns=["*.jpg", "*.avi"],
             ignore_directories=True,
             case_sensitive=False,
         )
         self.config = config
+        self.timestamp_font = get_images_timestamp_font(config)
 
     def _try_process_file(self, file_path: pathlib.Path) -> None:
         if file_path.name.startswith("."):
@@ -36,7 +37,17 @@ class ImageFileHandler(PatternMatchingEventHandler):
             return
 
         try:
-            dest_path = process_single_image(file_path, self.config, get_images_timestamp_font(self.config))
+            if file_path.suffix.lower() == ".jpg":
+                dest_path = process_single_image(
+                    file_path, self.config, self.timestamp_font
+                )
+            elif file_path.suffix.lower() == ".avi":
+                dest_path = process_single_video(file_path, self.config)
+            else:
+                logger.warning(
+                    f"File {file_path.name} is not a supported format, suffix must be .jpg or .avi, skipping"
+                )
+                return
         except Exception:
             logger.exception(f"Error processing file {file_path}")
         else:
@@ -86,12 +97,18 @@ class ImageFileHandler(PatternMatchingEventHandler):
         new_processed_file_path = get_output_path(new_file_path, self.config)
 
         try:
-            logger.debug(f"Moving processed file {old_processed_file_path} -> {new_processed_file_path}")
+            logger.debug(
+                f"Moving processed file {old_processed_file_path} -> {new_processed_file_path}"
+            )
             shutil.move(old_processed_file_path, new_processed_file_path)
         except Exception:
-            logger.exception(f"Error moving file {old_processed_file_path} -> {new_processed_file_path}")
+            logger.exception(
+                f"Error moving file {old_processed_file_path} -> {new_processed_file_path}"
+            )
         else:
-            logger.debug(f"Successfully moved file {old_processed_file_path} -> {new_processed_file_path}")
+            logger.debug(
+                f"Successfully moved file {old_processed_file_path} -> {new_processed_file_path}"
+            )
 
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
@@ -105,13 +122,20 @@ def observe_and_action_fs_events(
     recursive: bool = True,
     sleep_time: float = 0.1,
 ) -> None:
-    logger.info(f"Starting to observe file system events for source files in {config.source_files_dir}")
+    logger.info(
+        f"Starting to observe file system events for source files in {config.source_files_dir}"
+    )
 
-    images_handler = ImageFileHandler(config)
+    file_handler = RetrosnapFileHandler(config)
     observer = Observer()
 
-    observer.schedule(images_handler, str(config.source_files_dir.resolve()), recursive=recursive)
+    observer.schedule(
+        file_handler, str(config.source_files_dir.resolve()), recursive=recursive
+    )
     observer.start()
+
+    # TODO: Add kodi integration -- when there are no tasks in the queue for N seconds,
+    #       regresh the Kodi library and re-start the slideshow (if necessary)
 
     try:
         while True:
