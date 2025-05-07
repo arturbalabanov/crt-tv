@@ -111,7 +111,6 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         new_file_path = pathlib.Path(event.dest_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file moved: {old_file_path} -> {new_file_path}")
-        logger.debug(f"Old file stats: {old_file_path.stat()}")
         logger.debug(f"New file stats: {new_file_path.stat()}")
 
         # check if moved outside of self.config.source_files_dir
@@ -140,7 +139,6 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         old_file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file deleted: {old_file_path}")
-        logger.debug(f"File stats: {old_file_path.stat()}")
         self._try_delete_processed_file(old_file_path)
 
 
