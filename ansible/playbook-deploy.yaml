@@ -79,7 +79,7 @@
 
     - name: Deploy the Kodi startup script's addon config
       ansible.builtin.template:
-        src: templates/kodi-autoexec/addon.xml.jinaj2
+        src: templates/kodi-autoexec/addon.xml.jinja2
         dest: /root/.kodi/addons/service.autoexec/addon.xml
         group: root
         owner: root
