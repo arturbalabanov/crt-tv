@@ -1,0 +1,25 @@
+import xbmc
+import pathlib
+import re
+
+crt_tv_config_file_path = pathlib.Path.home() / ".config" / "crt-tv.toml"
+
+output_files_dir = None
+
+for line in crt_tv_config_file_path.read_text().splitlines():
+    output_line_match = re.search(r"^\s*output_files_dir\s*=\s*['\"](.*)['\"]\s*$", line)
+
+    if output_line_match is not None:
+        output_files_dir = output_line_match.group(1)
+        break
+
+# refs:
+#     * https://kodi.wiki/view/List_of_built-in_functions
+#     * https://kodi.wiki/view/Window_IDs
+
+if output_files_dir is not None:
+    # Activate the exit screen window, so that when we hit Back, we can exit Kodi immediately
+    xbmc.executebuiltin('ActivateWindow(10111)')
+    # Start a recursive slideshow at the output files dir
+    xbmc.executebuiltin('RecursiveSlideShow({})'.format(output_files_dir))
+

@@ -68,3 +68,27 @@
         enabled: true
         daemon_reload: true
         name: crt_tv_fs_observer.service
+
+    - name: Create the Kodi startup script plugin directory
+      ansible.builtin.file:
+        path: /root/.kodi/addons/service.autoexec
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Deploy the Kodi startup script's addon config
+      ansible.builtin.template:
+        src: templates/kodi-autoexec/addon.xml
+        dest: /root/.kodi/addons/service.autoexec/addon.xml
+        group: root
+        owner: root
+        mode: "0644"
+
+    - name: Deploy the Kodi startup script
+      ansible.builtin.template:
+        src: templates/kodi-autoexec/autoexec.py
+        dest: /root/.kodi/addons/service.autoexec/autoexec.py
+        group: root
+        owner: root
+        mode: "0644"

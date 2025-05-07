@@ -163,6 +163,8 @@ def observe_and_action_fs_events(
     # TODO: Add kodi integration -- when there are no tasks in the queue for N seconds,
     #       regresh the Kodi library and re-start the slideshow (if necessary)
     #       I think I can use observer.event_queue to check for this
+    #       Or maybe much simpler and more robust -- check if all files in source_files_dir
+    #       have a corresponding processed file in output_files_dir (excluging hidden files)
 
     try:
         while True:
