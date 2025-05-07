@@ -32,6 +32,10 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         self.timestamp_font = get_images_timestamp_font(config)
 
     def _try_process_file(self, file_path: pathlib.Path) -> None:
+        if file_path.name.startswith("."):
+            logger.debug(f"Skipping processing hidden file {file_path}")
+            return
+
         try:
             if file_path.suffix.lower() == ".jpg":
                 dest_path = process_single_image(
@@ -50,6 +54,10 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
             logger.debug(f"Successfully processed file {file_path} -> {dest_path}")
 
     def _try_delete_processed_file(self, file_path: pathlib.Path) -> None:
+        if file_path.name.startswith("."):
+            logger.debug(f"Skipping deleting hidden file {file_path}")
+            return
+
         processed_file_path = get_output_path(file_path, self.config)
 
         logger.debug(f"Deleting processed file {processed_file_path}")
