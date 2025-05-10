@@ -2,9 +2,12 @@ import xbmc
 import pathlib
 import re
 
-crt_tv_config_file_path = pathlib.Path.home() / ".config" / "crt-tv.toml"
+crt_tv_config_file_path = pathlib.Path("{{ crt_tv_config_file_path }}").resolve()
 
 output_files_dir = None
+
+# using regex to parse the crt_tv_config_file_path as older versions of python (which Kodi uses)
+# don't ship with the tomlib module and it's not worth the effort to to install dependencies just for this
 
 for line in crt_tv_config_file_path.read_text().splitlines():
     output_line_match = re.search(r"^\s*output_files_dir\s*=\s*['\"](.*)['\"]\s*$", line)

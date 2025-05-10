@@ -7,7 +7,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/root/.local/bin/crt-tv --verbose run-observer
+ExecStart=/root/.local/bin/crt-tv --config-file "{{ config_file_path }}" --verbose run-observer
 StandardOutput=syslog
 StandardError=syslog
 

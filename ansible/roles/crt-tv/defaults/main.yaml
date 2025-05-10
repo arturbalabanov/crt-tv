@@ -1,3 +1,4 @@
 ---
 version: main
 install_dir: /opt/crt-tv
+config_file_path: /root/.config/crt-tv.toml

@@ -1,3 +1,4 @@
 ---
 kodi_data_dir: "/root/.kodi"
 addon_dir: "{{ kodi_data_dir }}/addons/service.autoexec"
+crt_tv_config_file_path: "/root/.config/crt-tv.toml"

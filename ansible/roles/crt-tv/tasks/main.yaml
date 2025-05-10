@@ -24,6 +24,14 @@
   when: result.before != result.after
   changed_when: true
 
+- name: Deploy the default config file
+  ansible.builtin.template:
+    src: templates/config.toml.jinja2
+    dest: "{{ config_file_path }}"
+    group: root
+    owner: root
+    mode: 0644
+
 - name: Deploy crt_tv_fs_observer.service systemd service
   ansible.builtin.template:
     src: templates/crt_tv_fs_observer.service.jinja2
