@@ -1,0 +1,28 @@
+---
+- name: Check if uv is installed
+  ansible.builtin.command:
+    cmd: uv --version
+  register: uv_installed
+  check_mode: false
+  changed_when: false
+  failed_when: uv_installed.rc != 0 and uv_installed.rc != 127
+
+- name: Donwload uv
+  ansible.builtin.get_url:
+    url: https://astral.sh/uv/install.sh
+    dest: /tmp/install-uv.sh
+    mode: "0755"
+  when: "'command not found' in uv_installed.stdout"
+
+- name: Install uv
+  ansible.builtin.command:
+    cmd: ./install-uv.sh
+    chdir: /tmp
+  when: "'command not found' in uv_installed.stdout"
+  changed_when: true
+
+- name: Remove the uv installer script
+  ansible.builtin.file:
+    path: /tmp/install-uv.sh
+    state: absent
+  when: "'command not found' in uv_installed.stdout"

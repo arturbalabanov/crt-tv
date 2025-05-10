@@ -1,0 +1,23 @@
+---
+- name: Install SMB (Samba) for remote file access
+  ansible.builtin.apt:
+    state: present
+    name:
+      - samba
+      - samba-common-bin
+      - smbclient
+      - cifs-utils
+
+- name: Set up the SMB (Samba) configuration files
+  ansible.builtin.template:
+    src: templates/smb.conf.jinja2
+    dest: /etc/samba/smb.conf
+    group: root
+    owner: root
+    mode: 0644
+
+- name: Enable and restart the smbd (Samba) service
+  ansible.builtin.systemd_service:
+    enabled: true
+    state: restarted
+    name: smbd.service

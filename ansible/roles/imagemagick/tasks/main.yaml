@@ -1,0 +1,15 @@
+---
+- name: Install system packages requirements
+  ansible.builtin.apt:
+    state: present
+    name:
+      - imagemagick
+
+# ref: https://github.com/Zulko/moviepy/issues/401#issuecomment-278679961
+- name: Update the ImageMagick's security policy
+  ansible.builtin.template:
+    src: templates/policy.xml.jinja2
+    dest: /etc/ImageMagick-{{ major_version }}/policy.xml
+    group: root
+    owner: root
+    mode: 0644

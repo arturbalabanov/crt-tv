@@ -175,11 +175,11 @@
 
 # File creation mask is set to 0700 for security reasons. If you want to
 # create files with group=rw permissions, set next parameter to 0775.
-   create mask = 0777
+   create mask = {{ default_create_mask }}
 
 # Directory creation mask is set to 0700 for security reasons. If you want to
 # create dirs. with group=rw permissions, set next parameter to 0775.
-   directory mask = 0777
+   directory mask = {{ default_directory_mask }}
 
 # By default, \\server\username shares can be connected to by anyone
 # with access to the samba server.
@@ -233,23 +233,12 @@
 # to the drivers directory for these users to have write rights in it
 ;   write list = root, @lpadmin
 
-[retrosnap]
-comment = retrosnap
-public = yes
-writeable = yes
-browsable = yes 
-path = /media/usb1/retrosnap
+{% for share_dir in share_dirs %}
+[{{ share_dir.name }}]
+comment = {{ share_dir.name }}
+public = {{ share_dir.public | default('yes') }}
+writeable = {{ share_dir.writable | default('yes') }}
+browsable = {{ share_dir.browsable | default('yes') }}
+path = {{ drive_mount_path }}/{{ share_dir.path | default(share_dir.name) }}
 
-[roms]
-comment = roms
-public = yes
-writeable = yes
-browsable = yes 
-path = /media/usb1/roms
-
-[bios]
-comment = bios
-public = yes
-writable = yes
-browsable = yes
-path = /media/usb1/bios
+{% endfor %}

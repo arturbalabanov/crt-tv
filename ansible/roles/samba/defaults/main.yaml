@@ -1,0 +1,8 @@
+---
+drive_mount_path: "/media/usb1"
+default_create_mask: "0777"
+default_directory_mask: "0777"
+share_dirs:
+  - name: retrosnap
+  - name: roms
+  - name: bios

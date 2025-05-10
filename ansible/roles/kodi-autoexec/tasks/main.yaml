@@ -1,0 +1,24 @@
+---
+- name: Create the Kodi startup script plugin directory
+  ansible.builtin.file:
+    path: "{{ addon_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the Kodi startup script's addon config
+  ansible.builtin.template:
+    src: templates/addon.xml.jinja2
+    dest: "{{ addon_dir }}/addon.xml"
+    group: root
+    owner: root
+    mode: "0644"
+
+- name: Deploy the Kodi startup script
+  ansible.builtin.template:
+    src: templates/autoexec.py.jinja2
+    dest: "{{ addon_dir }}/autoexec.py"
+    group: root
+    owner: root
+    mode: "0644"
