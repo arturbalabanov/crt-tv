@@ -87,18 +87,24 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
                 logger.debug("Kodi is running, refreshing slideshow")
                 kodi.refresh_slideshow(self.config)
 
+    def _try_log_file_stats(self, file_path: pathlib.Path) -> None:
+        try:
+            logger.debug(f"File stats: {file_path.stat()}")
+        except Exception:
+            logger.warning(f"Unable to log file stats for {file_path}", exc_info=True)
+
     def on_created(self, event: FileCreatedEvent) -> None:  # type: ignore[override]
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file created: {file_path}")
-        logger.debug(f"File stats: {file_path.stat()}")
 
+        self._try_log_file_stats(file_path)
         self._try_process_file(file_path)
 
     def on_modified(self, event: FileModifiedEvent) -> None:  # type: ignore[override]
         file_path = pathlib.Path(event.src_path)  # type: ignore[arg-type]
         logger.debug(f"Detected file modified: {file_path}")
-        logger.debug(f"File stats: {file_path.stat()}")
+        self._try_log_file_stats(file_path)
 
         if file_path.name.startswith("."):
             logger.debug(f"Skipping processing hidden file {file_path}")
@@ -118,7 +124,7 @@ class RetrosnapFileHandler(PatternMatchingEventHandler):
         new_file_path = pathlib.Path(event.dest_path)  # type: ignore[arg-type]
 
         logger.debug(f"Detected file moved: {old_file_path} -> {new_file_path}")
-        logger.debug(f"New file stats: {new_file_path.stat()}")
+        self._try_log_file_stats(new_file_path)
 
         # check if moved outside of self.config.source_files_dir
         if not new_file_path.is_relative_to(self.config.source_files_dir):
