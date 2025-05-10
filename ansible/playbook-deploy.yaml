@@ -1,9 +1,36 @@
+# TODO: Split into roles
+# TODO: Set up the initial config file using ansible config options (mainly paths | Remember to update the ansible
+#       config files respectively)
+
 ---
 - name: Deploy the latest version of the scripts to the CRT-connected raspberry pi
   hosts: crt
   tasks:
     - name: Ping the hosts
       ansible.builtin.ping:
+
+    - name: Install SMB (Samba) for remote file access
+      ansible.builtin.apt:
+        state: present
+        name:
+          - samba
+          - samba-common-bin
+          - smbclient
+          - cifs-utils
+
+    - name: Set up the SMB (Samba) configuration files
+      ansible.builtin.template:
+        src: templates/smb.conf.jinja2
+        dest: /etc/samba/smb.conf
+        group: root
+        owner: root
+        mode: 0644
+
+    - name: Enable and restart the smbd (Samba) service
+      ansible.builtin.systemd_service:
+        enabled: true
+        state: restarted
+        name: smbd.service
 
     - name: Install system packages requirements
       ansible.builtin.apt:
@@ -64,9 +91,9 @@
 
     - name: Enable and restart crt_tv_fs_observer.service
       ansible.builtin.systemd_service:
-        state: restarted
         enabled: true
         daemon_reload: true
+        state: restarted
         name: crt_tv_fs_observer.service
 
     - name: Create the Kodi startup script plugin directory
