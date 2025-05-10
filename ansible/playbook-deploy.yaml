@@ -1,6 +1,3 @@
-# TODO: Set up the initial config file using ansible config options (mainly paths | Remember to update the ansible
-#       config files respectively)
-
 ---
 - name: Deploy the latest version of the scripts to the CRT-connected raspberry pi
   hosts: crt
@@ -10,3 +7,4 @@
     - name: imagemagick
     - name: crt-tv
     - name: kodi-autoexec
+    - name: kodi-keymaps

@@ -27,6 +27,10 @@ ansible-ping:  ## Ping the raspberry pi to make sure it's reachable and we can d
 .PHONY: deploy
 deploy: clean  ## Deploy the project to the remote host
 	uv run ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_DEPLOY_PLAYBOOK)
+	
+ansible_role_names = $(shell find ansible/roles -type d -maxdepth 1 -mindepth 1  -execdir echo '{}' ';')
+$(ansible_role_names): clean   ## Deploy a specific role to the remote host
+	uv run ansible all -i ansible/inventory.yaml --module-name include_role --args name=ansible/roles/$@
 
 .PHONY: service-logs
 service-logs:  ## Show the logs of the systemd service

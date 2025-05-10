@@ -1,0 +1,14 @@
+<keymap>
+{% for section_name in ["Global", "Slideshow", "FullscreenVideo", "FullscreenInfo"] %}
+  <{{ section_name }}>
+    <joystick profile="game.controller.default">
+      <lefttrigger>
+        RunScript("{{ custom_scripts_dir }}/system_volume_control.py", down) 
+      </lefttrigger>
+      <righttrigger>
+        RunScript("{{ custom_scripts_dir }}/system_volume_control.py", up) 
+      </righttrigger>
+    </joystick>
+  </{{ section_name }}>
+{% endfor %}
+</keymap>

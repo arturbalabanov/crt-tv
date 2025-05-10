@@ -1,0 +1,32 @@
+---
+- name: Create the Kodi keymaps directory
+  ansible.builtin.file:
+    path: "{{ kodi_data_dir }}/userdata/keymaps/"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the Kodi custom scripts directory
+  ansible.builtin.file:
+    path: "{{ custom_scripts_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the Kodi keymaps
+  ansible.builtin.template:
+    src: templates/keymaps.xml.jinja2
+    dest: "{{ kodi_data_dir }}/userdata/keymaps/10-custom.xml"
+    group: root
+    owner: root
+    mode: "0644"
+
+- name: Deploy the system volume control script
+  ansible.builtin.template:
+    src: templates/system_volume_control.py.jinja2
+    dest: "{{ custom_scripts_dir }}/system_volume_control.py"
+    group: root
+    owner: root
+    mode: "0644"

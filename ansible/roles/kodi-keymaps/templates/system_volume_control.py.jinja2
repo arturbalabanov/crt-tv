@@ -1,0 +1,19 @@
+# A script to control the system volume as Kodi has its own volume control
+# and there doesn't seem to be a way to use the system volume control instead
+
+import os
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("direction", choices=["up", "down"])
+
+args = parser.parse_args()
+
+if args.direction == "up":
+    os.system("amixer set 'Headphone' -M 10%+")
+    os.system('kodi-send --action "Notification(Volume, Volume INCREASED by 10%, 100)"')
+elif args.direction == "down":
+    os.system("amixer set 'Headphone' -M 10%-")
+    os.system('kodi-send --action "Notification(Volume, Volume DECREASED by 10%, 100)"')
+else:
+    raise RuntimeError("Invalid direction: {}".format(args.direction))
