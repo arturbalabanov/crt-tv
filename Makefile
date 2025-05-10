@@ -6,6 +6,7 @@ ANSIBLE_DEPLOY_PLAYBOOK = ansible/playbook-deploy.yaml
 
 SSH_HOST = crt
 SYSTEMD_SERVICE_NAME = crt_tv_fs_observer.service
+BACKUP_DIR = $(shell dirname ~/backup/crt-tv)/crt-tv
 
 .PHONY: help
 help:  ## Generates a help README
@@ -34,6 +35,16 @@ service-logs:  ## Show the logs of the systemd service
 .PHONY: service-status
 service-status:  ## Show the logs of the systemd service
 	TERM=xterm ssh -t "$(SSH_HOST)" "systemctl status $(SYSTEMD_SERVICE_NAME)"
+
+.PHONY: backup
+backup:  ## Backup the Raspberry Pi SD card
+	$(eval SD_CARD_DEVICE := $(shell ssh "$(SSH_HOST)" "lsblk -p -n -o PKNAME \$$(findmnt -n -o SOURCE /)"))
+	$(eval BACKUP_FILE := $(BACKUP_DIR)/$(shell date +%Y-%m-%dT%H-%M-%S).img.gz)
+	
+	@echo "Backing up SD card device $(SD_CARD_DEVICE) into local file $(BACKUP_FILE)"
+	
+	mkdir -p $(BACKUP_DIR)
+	ssh "$(SSH_HOST)" "sudo dd if=$(SD_CARD_DEVICE) bs=1M | gzip -" | dd of=$(BACKUP_FILE) status=progress
 
 .PHONY: install
 install:  ## Install the CLI tool locally
