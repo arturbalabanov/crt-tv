@@ -22,7 +22,7 @@ for line in crt_tv_config_file_path.read_text().splitlines():
 
 if output_files_dir is not None:
     # Activate the exit screen window, so that when we hit Back, we can exit Kodi immediately
-    xbmc.executebuiltin('ActivateWindow(10111)')
+    xbmc.executebuiltin('ActivateWindow(ShutDownMenu)')
     # Start a recursive slideshow at the output files dir
     xbmc.executebuiltin('RecursiveSlideShow({})'.format(output_files_dir))
 

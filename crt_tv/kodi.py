@@ -50,4 +50,4 @@ def refresh_slideshow(config: Config) -> None:
 
 @require_kodi_running
 def open_shutdown_menu() -> None:
-    kodi_send("ActivateWindow(10111)")
+    kodi_send("ActivateWindow(ShutDownMenu)")
