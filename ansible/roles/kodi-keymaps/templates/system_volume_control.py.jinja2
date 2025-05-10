@@ -5,6 +5,8 @@ import argparse
 import subprocess
 import re
 
+import xbmc
+
 parser = argparse.ArgumentParser()
 parser.add_argument("direction", choices=["up", "down"])
 
@@ -13,8 +15,7 @@ args = parser.parse_args()
 NEW_VOLUME_REGEX = re.compile(r"Mono:.*\[(?P<new_volume_perc>\d+)%\]", flags=re.MULTILINE | re.IGNORECASE)
 
 def send_kodi_notification(message: str, *, timeout_ms: int = 100) -> None:
-    notification_action = "Notification(System Volume, {}, {})".format(message, timeout_ms)
-    subprocess.run(["kodi-send", "--action", notification_action], check=True)
+    xbmc.executebuiltin('Notification(System Volume, {}, {})'.format(message, timeout_ms))
 
 
 def change_volume(direction: str, step_perc: int, *, notification_timeout_ms: int = 100) -> None:
