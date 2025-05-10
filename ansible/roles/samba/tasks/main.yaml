@@ -21,3 +21,10 @@
     enabled: true
     state: restarted
     name: smbd.service
+
+# Without this we need to manually enter the IP of the device to connect
+- name: Enable and restart avahi daemon service to make samba discoverable
+  ansible.builtin.systemd_service:
+    enabled: true
+    state: restarted
+    name: avahi-daemon.service
