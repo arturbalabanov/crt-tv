@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# This is the original file from the RGB-Pi project,
+# the only modification is adding new timings (bellow the NOTE comment)
+
+# Timings to add
+timings=(
+    # 320x240p @ 60Hz
+    "320 1 20 32 45 240 1 2 3 16 0 0 0 60 0 6514560 1"
+    
+    # 720x480i @ 30Hz
+    "720 1 29 69 117 480 1 3 6 34 0 0 0 30 1 14670150 1"
+    
+    # 720x576i @ 25Hz
+    "720 1 29 69 117 576 1 7 6 38 0 0 0 25 1 14656125 4"
+    
+    # NOTE: Timings bellow this line are added by the crt-tv project
+    
+    # 480x360p @ 60Hz
+    "480 1 20 32 45 360 1 2 3 16 0 0 0 60 0 6400000 1"
+    
+    # 720x540i @ 25Hz
+    "720 0 61 73 130 540 0 16 6 63 0 0 0 25 1 15375000 1"
+
+    # FUCKING MASSIVE THANKS to the Pi400RGB project for suppluing the timings bellow!!!
+    # ref: https://github.com/llegoff/Pi400RGB
+    
+    # 384x288p @ 50Hz
+    "384 1 16 32 40 288 1 3 2 19 0 0 0 50 0 7363200 1"
+    
+    # 768x576i @ 50Hz
+    "768 1 24 72 88 576 1 6 5 38 0 0 0 50 1 14875000 1"
+    
+    # 640x480i @ 60 Hz
+    "640 1 24 64 104 480 1 3 6 34 0 0 0 60 1 13054080 1"
+)
+
+file="/opt/rgbpi/ui/data/timings.dat"
+
+# Check if the timings already exist in the file
+for line in "${timings[@]}"; do
+    if ! grep -qF "$line" "$file"; then
+        echo "$line" >> "$file"
+    fi
+done
+
+# Execute Kodi
+kodi

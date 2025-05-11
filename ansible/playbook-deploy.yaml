@@ -2,6 +2,7 @@
 - name: Deploy the latest version of the scripts to the CRT-connected raspberry pi
   hosts: crt
   roles:
+    - name: rgbpi
     - name: samba
     - name: uv
     - name: imagemagick

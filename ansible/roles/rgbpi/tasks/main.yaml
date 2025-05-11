@@ -1,0 +1,8 @@
+---
+- name: Deploy the kodi startup script with modified timings
+  ansible.builtin.template:
+    src: templates/kodi.sh.jinja2
+    dest: "/opt/rgbpi/kodi.sh"
+    group: root
+    owner: root
+    mode: "0777"
