@@ -30,3 +30,17 @@
     group: root
     owner: root
     mode: "0644"
+
+- name: Check if Kodi is currently running
+  ansible.builtin.command:
+    cmd: pgrep kodi
+  register: running_kodi_processes
+  check_mode: false
+  changed_when: false
+  failed_when: false
+
+- name: Reload Kodi keymaps on the running instances
+  ansible.builtin.command:
+    cmd: kodi-send --action "ReloadKeymaps"
+  when: "running_kodi_processes.rc == 0"
+  changed_when: true

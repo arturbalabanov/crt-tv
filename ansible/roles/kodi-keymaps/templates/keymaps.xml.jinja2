@@ -1,10 +1,23 @@
+<!-- ref: https://kodi.wiki/view/HOW-TO:Modify_joystick.xml -->
+
 <keymap>
 {% for section_name in ["Global", "Slideshow", "FullscreenVideo", "FullscreenInfo"] %}
   <{{ section_name }}>
     <joystick profile="game.controller.default">
+      <!-- press left analog stick -->
+      <leftthumb>ActivateWindow(SystemSettings)</leftthumb>
+      <leftthumb holdtime="500">
+        RunScript("{{ custom_scripts_dir }}/system_volume_control.py", toggle_mute) 
+      </leftthumb>
+      
+      <!-- press right analog stick -->
+      <rightthumb>ActivateWindow(ShutdownMenu)</rightthumb>
+      <rightthumb holdtime="500">Quit</rightthumb>
+      
       <lefttrigger>
         RunScript("{{ custom_scripts_dir }}/system_volume_control.py", down) 
       </lefttrigger>
+      
       <righttrigger>
         RunScript("{{ custom_scripts_dir }}/system_volume_control.py", up) 
       </righttrigger>

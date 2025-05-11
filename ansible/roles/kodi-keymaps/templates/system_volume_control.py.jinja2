@@ -8,17 +8,27 @@ import re
 import xbmc
 
 parser = argparse.ArgumentParser()
-parser.add_argument("direction", choices=["up", "down"])
+parser.add_argument("command", choices=["up", "down", "toggle_mute"])
 
 args = parser.parse_args()
 
-NEW_VOLUME_REGEX = re.compile(r"Mono:.*\[(?P<new_volume_perc>\d+)%\]", flags=re.MULTILINE | re.IGNORECASE)
 
-def send_kodi_notification(message: str, *, timeout_ms: int = 100) -> None:
+NEW_VOLUME_REGEX = re.compile(r"Mono:.*\[(?P<new_volume_perc>\d+)%\].*\[(?P<on_or_off>on|off)\]\s*$", flags=re.MULTILINE | re.IGNORECASE)
+
+SUCCESS_NOTIFICATION_TIMEOUT_MS = 100
+ERROR_NOTIFICATION_TIMEOUT_MS = 2000
+
+def send_kodi_notification(message: str, *, error: bool = False) -> None:
+    if error:
+        message = "ERROR: {}".format(message)
+        timeout_ms = ERROR_NOTIFICATION_TIMEOUT_MS
+    else:
+        timeout_ms = SUCCESS_NOTIFICATION_TIMEOUT_MS
+        
     xbmc.executebuiltin('Notification(System Volume, {}, {})'.format(message, timeout_ms))
 
 
-def change_volume(direction: str, step_perc: int, *, notification_timeout_ms: int = 100) -> None:
+def change_volume(direction: str, step_perc: int) -> None:
     if direction == "up":
         change_sign = "+"
         change_str = "INCREASED"
@@ -35,7 +45,7 @@ def change_volume(direction: str, step_perc: int, *, notification_timeout_ms: in
     )
 
     if result.returncode != 0:
-        send_kodi_notification("ERROR: Failed to change volume", timeout_ms=2000)
+        send_kodi_notification("Failed to change volume", error=True)
         return
     
     notification_msg = "{} by {}%".format(change_str, step_perc)
@@ -46,11 +56,42 @@ def change_volume(direction: str, step_perc: int, *, notification_timeout_ms: in
     if new_volume_match:
         notification_msg += " to {}%".format(new_volume_match.group("new_volume_perc"))
     
-    send_kodi_notification(notification_msg, timeout_ms=notification_timeout_ms)
+    send_kodi_notification(notification_msg)
 
-if args.direction == "up":
+def toggle_mute_volume() -> None:
+    result = subprocess.run(
+        ["amixer", "set", "Headphone", "-M", "toggle"],
+        check=False,
+        capture_output=True,
+    )
+
+    if result.returncode != 0:
+        send_kodi_notification("Failed to toggle mute", error=True)
+        return
+
+    output_str = result.stdout.decode("utf-8")
+    
+    new_volume_match = NEW_VOLUME_REGEX.search(output_str)
+    
+    if not new_volume_match:
+        send_kodi_notification("Failed to parse mute status", error=True)
+        return
+
+    is_muted = new_volume_match.group("on_or_off") == "off"
+    volume_perc = new_volume_match.group("new_volume_perc")
+    
+    if new_volume_match.group("on_or_off") == "off":
+        notification_msg = "MUTED at {}".format(volume_perc)
+    else:
+        notification_msg = "UNMUTED at {}".format(volume_perc)
+        
+    send_kodi_notification(notification_msg)
+
+if args.command == "up":
     change_volume("up", 10)
-elif args.direction == "down":
+elif args.command == "down":
     change_volume("down", 10)
+elif args.command == "toggle_mute":
+    toggle_mute_volume()
 else:
-    raise RuntimeError("Invalid direction: {}".format(args.direction))
+    raise RuntimeError("Invalid command: {}".format(args.command))
